@@ -77,15 +77,16 @@ DecodedRaw decode(std::string buffer, int len) {
       //.data = Uint16Array.new_(width * height * 4)
   };
   std::unique_ptr<uint16_t[]> rgba(new uint16_t[width * height * 4]);
-  uint16_t* rgb = (uint16_t*)pri->data;
+  uint16_t *rgb = (uint16_t *)pri->data;
 
-  for(int i = 0; i < width * height; i++) {
-	  rgba[i * 4 + 0] = rgb[i*3 + 0];
-	  rgba[i * 4 + 1] = rgb[i*3 + 1];
-	  rgba[i * 4 + 2] = rgb[i*3 + 2];
-	  rgba[i * 4 + 3] = ~0;
+  for (int i = 0; i < width * height; i++) {
+    rgba[i * 4 + 0] = rgb[i * 3 + 0];
+    rgba[i * 4 + 1] = rgb[i * 3 + 1];
+    rgba[i * 4 + 2] = rgb[i * 3 + 2];
+    rgba[i * 4 + 3] = ~0;
   }
-  result.data = Uint16Array.new_(typed_memory_view(width * height * 4, rgba.get()));
+  result.data =
+      Uint16Array.new_(typed_memory_view(width * height * 4, rgba.get()));
   return result;
 }
 
