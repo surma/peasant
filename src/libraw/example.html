@@ -1,28 +1,29 @@
-<!doctype html>
-<input type="file">
+<!DOCTYPE html>
+<input type="file" />
 <canvas></canvas>
 <script type="module">
-	import libraw from "./libraw.js";
-	
-	const fileInput = document.querySelector("input");
-	const ctx = document.querySelector("canvas").getContext("2d");
-	async function run() {
-		const instance = await libraw({
-			locateFile() {
-				return "/libraw.wasm";
-			}
-		});
-		const contents = await new Response(fileInput.files[0]).arrayBuffer()
-		const result = instance.decode(contents, contents.byteLength);
-		console.log({result});
-		ctx.canvas.width = result.width;
-		ctx.canvas.height = result.height;
-		const rgba = new Uint8ClampedArray(result.data.length);
-		for(let i = 0; i < rgba.length; i++) {
-			rgba[i] = result.data[i] * 255 / 65535;
-		}
-		const imgData = new ImageData(rgba, result.width, result.height);
-		ctx.putImageData(imgData, 0, 0);
-	}
-	fileInput.oninput = run;
+  import libraw from "./libraw.js";
+
+  const instancePromise = libraw({
+    locateFile() {
+      return "/libraw.wasm";
+    }
+  });
+  const fileInput = document.querySelector("input");
+  const ctx = document.querySelector("canvas").getContext("2d");
+  async function run() {
+    const instance = await instancePromise;
+    const contents = await new Response(fileInput.files[0]).arrayBuffer();
+    const result = instance.decode(contents, contents.byteLength);
+    console.log({ result });
+    ctx.canvas.width = result.width;
+    ctx.canvas.height = result.height;
+    const rgba = new Uint8ClampedArray(result.data.length);
+    for (let i = 0; i < rgba.length; i++) {
+      rgba[i] = (result.data[i] * 255) / 65535;
+    }
+    const imgData = new ImageData(rgba, result.width, result.height);
+    ctx.putImageData(imgData, 0, 0);
+  }
+  fileInput.oninput = run;
 </script>

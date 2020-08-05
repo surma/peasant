@@ -66,16 +66,13 @@ DecodedRaw decode(std::string buffer, int len) {
 
   auto width = pri->width;
   auto height = pri->height;
-  auto result = DecodedRaw{
-      .width = width,
-      .height = height,
-      .bps = 16,
-      .num_channels = 3,
-      .iso = lr->other.iso_speed,
-      .focal_length = lr->other.focal_len,
-      .aperture = lr->other.aperture,
-      //.data = Uint16Array.new_(width * height * 4)
-  };
+  auto result = DecodedRaw{.width = width,
+                           .height = height,
+                           .bps = 16,
+                           .num_channels = 3,
+                           .iso = lr->other.iso_speed,
+                           .focal_length = lr->other.focal_len,
+                           .aperture = lr->other.aperture};
   std::unique_ptr<uint16_t[]> rgba(new uint16_t[width * height * 4]);
   uint16_t *rgb = (uint16_t *)pri->data;
 
@@ -87,6 +84,9 @@ DecodedRaw decode(std::string buffer, int len) {
   }
   result.data =
       Uint16Array.new_(typed_memory_view(width * height * 4, rgba.get()));
+
+  libraw_dcraw_clear_mem(pri);
+  libraw_close(lr);
   return result;
 }
 
