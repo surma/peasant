@@ -1,3 +1,4 @@
-.tmp
-libraw.js
-libraw.wasm
+/.tmp
+/libraw.js
+/libraw.wasm
+/target

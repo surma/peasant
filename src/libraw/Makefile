@@ -8,9 +8,17 @@ LIBRAW = $(LIBRAW_BUILD_FOLDER)/lib/.libs/libraw.a
 
 OUTPUT = libraw.js
 
-.PHONY: all clean clean-all
+ifdef EMSCRIPTEN
+	CONFIGURE = emconfigure
+else
+	CONFIGURE =
+endif
+
+.PHONY: all clean clean-all libraw
 
 all: $(OUTPUT)
+
+libraw: $(LIBRAW)
 
 $(LIBRAW_FOLDER)/configure.ac:
 	mkdir -p $(LIBRAW_FOLDER)
@@ -23,17 +31,17 @@ $(LIBRAW_FOLDER)/configure: $(LIBRAW_FOLDER)/configure.ac
 $(LIBRAW_BUILD_FOLDER)/Makefile: $(LIBRAW_FOLDER)/configure
 	mkdir -p $(LIBRAW_BUILD_FOLDER)
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	emconfigure ../configure \
+	$(CONFIGURE) ../configure \
       --disable-openmp \
       --disable-lcms \
       --disable-examples 
 
 $(LIBRAW): $(LIBRAW_BUILD_FOLDER)/Makefile
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	emmake $(MAKE)
+	$(MAKE)
 
 $(OUTPUT): $(LIBRAW)
-	emcc \
+	$(CC) \
 		-O3 \
 		$(CXXFLAGS) \
 		--bind \
