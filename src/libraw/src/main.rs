@@ -1,9 +1,11 @@
 mod bindings;
+mod wrapper;
 
-use bindings::*;
 fn main() {
     println!(
         "Hello, world! v{}.{}.{}",
-        LIBRAW_MAJOR_VERSION, LIBRAW_MINOR_VERSION, LIBRAW_PATCH_VERSION
+        wrapper::VERSION_MAJOR,
+        wrapper::VERSION_MINOR,
+        wrapper::VERSION_PATCH
     );
 }
