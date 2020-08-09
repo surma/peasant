@@ -17,6 +17,8 @@ fn main() {
         .expect("Failed to build libraw");
 
     println!("cargo:rustc-link-lib=static=raw");
+    println!("cargo:rustc-link-lib=c++");
+    println!("cargo:rustc-link-lib=z");
     println!("cargo:rustc-link-search=.tmp/libraw/.build/lib/.libs");
 
     let bindings = bindgen::Builder::default()
