@@ -119,14 +119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "libraw",
- "png",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,6 +207,7 @@ name = "libraw"
 version = "0.1.0"
 dependencies = [
  "bindgen",
+ "png",
 ]
 
 [[package]]

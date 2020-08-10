@@ -1,13 +1,11 @@
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
-mod bindings;
-mod wrapper;
 
 fn main() {
     println!(
         "LibRaw v{}.{}.{}",
-        wrapper::VERSION_MAJOR,
-        wrapper::VERSION_MINOR,
-        wrapper::VERSION_PATCH
+        libraw::VERSION_MAJOR,
+        libraw::VERSION_MINOR,
+        libraw::VERSION_PATCH
     );
     let file_path = args().collect::<Vec<String>>().swap_remove(1);
 
@@ -16,7 +14,7 @@ fn main() {
     let mut contents: Vec<u8> = Vec::new();
     file.read_to_end(&mut contents).expect("Couldn’t read file");
 
-    let mut data = wrapper::Data::from_buffer(Box::from(contents)).expect("Could not parse file");
+    let mut data = libraw::Data::from_buffer(Box::from(contents)).expect("Could not parse file");
     println!("Dimensions: {}x{}", data.raw_width(), data.raw_height());
     println!("Focal Length: {}mm", data.focal_length());
     println!("Aperture: f/{:0.1}", data.aperture());
