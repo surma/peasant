@@ -1,7 +1,8 @@
-use std::env;
-use std::path::PathBuf;
-use std::process::Command;
-use std::string::String;
+use std::{
+    env,
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 use bindgen;
 
@@ -10,9 +11,12 @@ fn main() {
         .output()
         .ok()
         .and_then(|output| String::from_utf8(output.stdout).ok())
-        .unwrap_or(String::from("0"));
-    Command::new("make")
-        .args(&[format!("-j{}", nproc).as_str(), "libraw"])
+        .unwrap_or(String::from("1"));
+    let nproc_param = format!("-j{}", nproc.trim());
+    let output = Command::new("make")
+        .args(&[nproc_param.as_str(), "libraw"])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .output()
         .expect("Failed to build libraw");
 
