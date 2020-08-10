@@ -8,3 +8,4 @@ edition = "2018"
 bindgen = "0.54.1"
 
 [dependencies]
+png = "0.16.7"

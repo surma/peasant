@@ -1,4 +1,4 @@
-use std::{env::args, fs::File, io::prelude::*};
+use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 mod bindings;
 mod wrapper;
 
@@ -32,10 +32,19 @@ fn main() {
         image.width(),
         image.height()
     );
-    println!(
-        "[{}, {}, {}]",
-        image.data()[0],
-        image.data()[1],
-        image.data()[2]
+
+    let file = File::create("./out.png").expect("Could not open output file");
+    let mut encoder = png::Encoder::new(
+        file,
+        image.width().try_into().unwrap(),
+        image.height().try_into().unwrap(),
     );
+    encoder.set_color(png::ColorType::RGB);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().expect("Could not write header");
+
+    let data: Vec<u8> = image.data().iter().map(|v| (v >> 8) as u8).collect();
+    writer
+        .write_image_data(&data)
+        .expect("Could not write pixel data"); // Save
 }
