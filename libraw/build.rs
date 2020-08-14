@@ -22,6 +22,8 @@ impl bindgen::callbacks::ParseCallbacks for IgnoreMacros {
 }
 
 fn main() {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+
     let nproc = Command::new("nproc")
         .output()
         .ok()
@@ -38,8 +40,8 @@ fn main() {
     println!("cargo:rustc-link-lib=static=raw");
     println!("cargo:rustc-link-lib=stdc++");
 
-    let mut lib_dir = PathBuf::from(env::current_dir().unwrap());
-    lib_dir.push(".tmp/libraw/.build/lib/.libs");
+    let mut lib_dir = out_dir.clone();
+    lib_dir.push("libraw/build/lib/.libs");
     println!("cargo:rustc-link-search={}", lib_dir.to_string_lossy());
 
     let ignored_macros = IgnoreMacros(
@@ -56,13 +58,12 @@ fn main() {
     );
 
     let bindings = bindgen::Builder::default()
-        .header(".tmp/libraw/libraw/libraw.h")
+        .header(out_dir.join("libraw/libraw/libraw.h").to_string_lossy())
         .parse_callbacks(Box::new(ignored_macros))
         .generate()
         .expect("Could not generate bindings");
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
-        .write_to_file(out_path.join("bindings.rs"))
+        .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 }
