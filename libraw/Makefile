@@ -32,9 +32,12 @@ $(LIBRAW_BUILD_FOLDER)/Makefile: $(LIBRAW_FOLDER)/configure
 	mkdir -p $(LIBRAW_BUILD_FOLDER)
 	cd $(LIBRAW_BUILD_FOLDER) && \
 	$(CONFIGURE) ../configure \
-      --disable-openmp \
-      --disable-lcms \
-      --disable-examples 
+	  --disable-openmp \
+	  --disable-lcms \
+	  --disable-jpeg \
+	  --disable-jasper \
+	  --disable-zlib \
+	  --disable-examples
 
 $(LIBRAW): $(LIBRAW_BUILD_FOLDER)/Makefile
 	cd $(LIBRAW_BUILD_FOLDER) && \

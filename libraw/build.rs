@@ -1,11 +1,25 @@
 #![allow(unreachable_code)]
 use std::{
+    collections::HashSet,
     env,
     path::PathBuf,
     process::{Command, Stdio},
 };
 
 use bindgen;
+
+#[derive(Debug)]
+struct IgnoreMacros(HashSet<String>);
+
+impl bindgen::callbacks::ParseCallbacks for IgnoreMacros {
+    fn will_parse_macro(&self, name: &str) -> bindgen::callbacks::MacroParsingBehavior {
+        if self.0.contains(name) {
+            bindgen::callbacks::MacroParsingBehavior::Ignore
+        } else {
+            bindgen::callbacks::MacroParsingBehavior::Default
+        }
+    }
+}
 
 fn main() {
     let nproc = Command::new("nproc")
@@ -22,16 +36,28 @@ fn main() {
         .expect("Failed to build libraw");
 
     println!("cargo:rustc-link-lib=static=raw");
-    println!("cargo:rustc-link-lib=c++");
-    println!("cargo:rustc-link-lib=z");
+    println!("cargo:rustc-link-lib=stdc++");
 
     let mut lib_dir = PathBuf::from(env::current_dir().unwrap());
     lib_dir.push(".tmp/libraw/.build/lib/.libs");
     println!("cargo:rustc-link-search={}", lib_dir.to_string_lossy());
 
+    let ignored_macros = IgnoreMacros(
+        vec![
+            "FP_INFINITE".into(),
+            "FP_NAN".into(),
+            "FP_NORMAL".into(),
+            "FP_SUBNORMAL".into(),
+            "FP_ZERO".into(),
+            "IPPORT_RESERVED".into(),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
     let bindings = bindgen::Builder::default()
         .header(".tmp/libraw/libraw/libraw.h")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(ignored_macros))
         .generate()
         .expect("Could not generate bindings");
 
