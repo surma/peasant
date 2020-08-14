@@ -38,7 +38,14 @@ fn main() {
         .expect("Failed to build libraw");
 
     println!("cargo:rustc-link-lib=static=raw");
-    println!("cargo:rustc-link-lib=stdc++");
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    // TODO: Check Windows and Wasm
+    if target_os == "linux" {
+        println!("cargo:rustc-link-lib=stdc++");
+    } else {
+        println!("cargo:rustc-link-lib=c++");
+    }
 
     let mut lib_dir = out_dir.clone();
     lib_dir.push("libraw/build/lib/.libs");
