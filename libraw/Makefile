@@ -8,10 +8,13 @@ LIBRAW = $(LIBRAW_BUILD_FOLDER)/lib/.libs/libraw.a
 
 OUTPUT = libraw.js
 
-ifdef EMSCRIPTEN
-	CONFIGURE = emconfigure
+ifeq ($(CARGO_CFG_TARGET_ARCH),wasm32)
+	CC = emcc
+	CONFIGURE_PREFIX = emconfigure
+	MAKE_PREFIX = emmake
 else
-	CONFIGURE =
+	CONFIGURE_PREFIX =
+	MAKE_PREFIX =
 endif
 
 .PHONY: all clean clean-all libraw
@@ -31,7 +34,7 @@ $(LIBRAW_FOLDER)/configure: $(LIBRAW_FOLDER)/configure.ac
 $(LIBRAW_BUILD_FOLDER)/Makefile: $(LIBRAW_FOLDER)/configure
 	mkdir -p $(LIBRAW_BUILD_FOLDER)
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	$(CONFIGURE) ../configure \
+	$(CONFIGURE_PREFIX) ../configure \
 	  --disable-openmp \
 	  --disable-lcms \
 	  --disable-jpeg \
@@ -41,7 +44,7 @@ $(LIBRAW_BUILD_FOLDER)/Makefile: $(LIBRAW_FOLDER)/configure
 
 $(LIBRAW): $(LIBRAW_BUILD_FOLDER)/Makefile
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	$(MAKE)
+	$(MAKE_PREFIX) $(MAKE)
 
 $(OUTPUT): $(LIBRAW)
 	$(CC) \

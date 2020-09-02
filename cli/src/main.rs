@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 
 fn main() {
@@ -41,7 +42,9 @@ fn main() {
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().expect("Could not write header");
 
-    let data: Vec<u8> = image.data().iter().map(|v| (v >> 8) as u8).collect();
+    println!("Converting to 8bit...");
+    let data: Vec<u8> = image.data().par_iter().map(|v| (v >> 8) as u8).collect();
+    println!("Done.");
     writer
         .write_image_data(&data)
         .expect("Could not write pixel data"); // Save

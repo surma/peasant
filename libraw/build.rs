@@ -49,7 +49,6 @@ fn main() {
 
     let mut lib_dir = out_dir.clone();
     lib_dir.push("libraw/build/lib/.libs");
-    println!("cargo:rustc-link-search={}", lib_dir.to_string_lossy());
 
     let ignored_macros = IgnoreMacros(
         vec![
@@ -73,4 +72,6 @@ fn main() {
     bindings
         .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");
+
+    println!("cargo:rustc-link-search={}", lib_dir.to_string_lossy());
 }
