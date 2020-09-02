@@ -1,16 +1,27 @@
-TMP_FOLDER = .tmp
+TMP_FOLDER = $(OUT_DIR)
 
 LIBRAW_FOLDER = $(TMP_FOLDER)/libraw
-LIBRAW_BUILD_FOLDER = $(LIBRAW_FOLDER)/.build
+LIBRAW_BUILD_FOLDER = $(LIBRAW_FOLDER)/build
 LIBRAW_VERSION = 0.20.0
 LIBRAW_URL = https://github.com/LibRaw/LibRaw
 LIBRAW = $(LIBRAW_BUILD_FOLDER)/lib/.libs/libraw.a
 
 OUTPUT = libraw.js
 
-.PHONY: all clean clean-all
+ifeq ($(CARGO_CFG_TARGET_ARCH),wasm32)
+	CC = emcc
+	CONFIGURE_PREFIX = emconfigure
+	MAKE_PREFIX = emmake
+else
+	CONFIGURE_PREFIX =
+	MAKE_PREFIX =
+endif
+
+.PHONY: all clean clean-all libraw
 
 all: $(OUTPUT)
+
+libraw: $(LIBRAW)
 
 $(LIBRAW_FOLDER)/configure.ac:
 	mkdir -p $(LIBRAW_FOLDER)
@@ -23,17 +34,20 @@ $(LIBRAW_FOLDER)/configure: $(LIBRAW_FOLDER)/configure.ac
 $(LIBRAW_BUILD_FOLDER)/Makefile: $(LIBRAW_FOLDER)/configure
 	mkdir -p $(LIBRAW_BUILD_FOLDER)
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	emconfigure ../configure \
-      --disable-openmp \
-      --disable-lcms \
-      --disable-examples 
+	$(CONFIGURE_PREFIX) ../configure \
+	  --disable-openmp \
+	  --disable-lcms \
+	  --disable-jpeg \
+	  --disable-jasper \
+	  --disable-zlib \
+	  --disable-examples
 
 $(LIBRAW): $(LIBRAW_BUILD_FOLDER)/Makefile
 	cd $(LIBRAW_BUILD_FOLDER) && \
-	emmake $(MAKE)
+	$(MAKE_PREFIX) $(MAKE)
 
 $(OUTPUT): $(LIBRAW)
-	emcc \
+	$(CC) \
 		-O3 \
 		$(CXXFLAGS) \
 		--bind \
