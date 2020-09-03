@@ -1,6 +1,8 @@
 use rayon::prelude::*;
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 
+use pixlproc::{self, Processor, RGB};
+
 fn main() {
     println!(
         "LibRaw v{}.{}.{}",
@@ -25,27 +27,39 @@ fn main() {
     } else {
         println!("Shutter: {}", data.shutter());
     }
-    let image = data.demosaic().expect("Could not demosaic");
+    let raw_image = data.demosaic().expect("Could not demosaic");
     println!(
         "Demosaiced dimensions: {}x{}",
-        image.width(),
-        image.height()
+        raw_image.width(),
+        raw_image.height()
     );
+
+    let image = RGB::from_u16(
+        raw_image.width(),
+        raw_image.height(),
+        raw_image.data().iter().copied(),
+    );
+    let inverter = pixlproc::InvertProcessor {};
+    let output = inverter.process(vec![image]).pop().unwrap();
 
     let file = File::create("./out.png").expect("Could not open output file");
     let mut encoder = png::Encoder::new(
         file,
-        image.width().try_into().unwrap(),
-        image.height().try_into().unwrap(),
+        output.width().try_into().unwrap(),
+        output.height().try_into().unwrap(),
     );
     encoder.set_color(png::ColorType::RGB);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().expect("Could not write header");
 
     println!("Converting to 8bit...");
-    let data: Vec<u8> = image.data().par_iter().map(|v| (v >> 8) as u8).collect();
+    let data8: Vec<u8> = output
+        .data()
+        .par_iter()
+        .map(|v| (v * 255.0) as u8)
+        .collect();
     println!("Done.");
     writer
-        .write_image_data(&data)
+        .write_image_data(&data8)
         .expect("Could not write pixel data"); // Save
 }

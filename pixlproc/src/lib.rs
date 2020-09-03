@@ -46,6 +46,14 @@ impl RGB {
         }
     }
 
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
     pub fn data(&self) -> &[f64] {
         &self.data
     }
