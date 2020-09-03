@@ -56,6 +56,19 @@ impl RGB {
             current: 0,
         }
     }
+
+    pub fn with_new_data<T: IntoIterator<Item = (f64, f64, f64)>>(&self, iter: T) -> RGB {
+        let data: Vec<f64> = iter
+            .into_iter()
+            .flat_map(|(r, g, b)| vec![r, g, b])
+            .collect();
+        assert!(data.len() == self.width * self.height * 3);
+        RGB {
+            width: self.width,
+            height: self.height,
+            data,
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a RGB {
@@ -88,9 +101,24 @@ impl<'a> Iterator for PixelIter<'a> {
     }
 }
 
-pub trait Pipeline {
-    fn process(input: Vec<RGB>) -> Vec<RGB>;
-    fn clear_caches() {}
+pub trait Processor {
+    fn num_slots(&self) -> (usize, usize);
+    fn process(&self, input: Vec<RGB>) -> Vec<RGB>;
+    fn clear_caches(&mut self) {}
+}
+
+pub struct InvertProcessor {}
+
+impl Processor for InvertProcessor {
+    fn num_slots(&self) -> (usize, usize) {
+        (1, 1)
+    }
+
+    fn process(&self, input: Vec<RGB>) -> Vec<RGB> {
+        assert!(input.len() == self.num_slots().0);
+        let input = &input[0];
+        vec![input.with_new_data(input.iter().map(|(r, g, b)| (1.0 - r, 1.0 - g, 1.0 - b)))]
+    }
 }
 
 #[cfg(test)]
@@ -127,5 +155,18 @@ mod tests {
             counter += 1;
         }
         assert_eq!(counter, 2);
+    }
+
+    #[test]
+    fn invert() {
+        use crate::{InvertProcessor, Processor};
+        let img = RGB::from_u8(3, 1, vec![255u8, 0, 0, 0, 255, 0, 0, 0, 255]);
+        let inv = InvertProcessor {};
+        let r = inv.process(vec![img]);
+        assert!(r.len() == 1);
+        assert_eq!(
+            r[0].data(),
+            vec![0f64, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0].as_slice()
+        );
     }
 }
