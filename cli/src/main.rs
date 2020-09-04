@@ -1,7 +1,10 @@
 use rayon::prelude::*;
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 
-use pixlproc::{self, Processor, RGB};
+use pixlproc::{
+    processor::{InvertProcessor, Processor},
+    RGB,
+};
 
 fn main() {
     println!(
@@ -39,7 +42,7 @@ fn main() {
         raw_image.height(),
         raw_image.data().iter().copied(),
     );
-    let inverter = pixlproc::InvertProcessor {};
+    let inverter = InvertProcessor::new();
     let output = inverter.process(vec![image]).pop().unwrap();
 
     let file = File::create("./out.png").expect("Could not open output file");
