@@ -1,8 +1,12 @@
 use crate::rgb::RGB;
 pub mod invert;
 pub use invert::InvertProcessor;
+
 pub mod resize;
 pub use self::resize::ResizeProcessor;
+
+pub mod pipeline;
+pub use pipeline::linear::LinearPipeline;
 
 pub trait Processor {
     fn num_slots(&self) -> (usize, usize);

@@ -2,9 +2,35 @@ use rayon::prelude::*;
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 
 use pixlproc::{
-    processor::{InvertProcessor, Processor, ResizeProcessor},
+    processor::{InvertProcessor, LinearPipeline, Processor, ResizeProcessor},
     RGB,
 };
+
+enum KnownProcessor {
+    ResizeProcessor_(ResizeProcessor),
+    InvertProcessor_(InvertProcessor),
+}
+
+impl Processor for KnownProcessor {
+    fn num_slots(&self) -> (usize, usize) {
+        match self {
+            KnownProcessor::ResizeProcessor_(p) => p.num_slots(),
+            KnownProcessor::InvertProcessor_(p) => p.num_slots(),
+        }
+    }
+    fn process(&self, input: Vec<RGB>) -> Vec<RGB> {
+        match self {
+            KnownProcessor::ResizeProcessor_(p) => p.process(input),
+            KnownProcessor::InvertProcessor_(p) => p.process(input),
+        }
+    }
+    fn clear_caches(&mut self) {
+        match self {
+            KnownProcessor::ResizeProcessor_(p) => p.clear_caches(),
+            KnownProcessor::InvertProcessor_(p) => p.clear_caches(),
+        }
+    }
+}
 
 fn main() {
     println!(
@@ -42,9 +68,13 @@ fn main() {
         raw_image.height(),
         raw_image.data().iter().copied(),
     );
-    let mut proc = ResizeProcessor::new();
-    proc.width = Some(1024);
-    //proc.resizer = pixlproc::processor::resize::Type::Lanczos3;
+    let mut proc = LinearPipeline::<KnownProcessor>::new();
+    proc.push({
+        let mut proc = ResizeProcessor::new();
+        proc.width = Some(1024);
+        KnownProcessor::ResizeProcessor_(proc)
+    });
+    proc.push({ KnownProcessor::InvertProcessor_(InvertProcessor::new()) });
     let output = proc.process(vec![image]).pop().unwrap();
 
     let file = File::create("./out.png").expect("Could not open output file");
