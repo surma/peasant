@@ -58,7 +58,14 @@ impl Processor for ResizeProcessor {
             dst_width,
             dst_height,
             resize::Pixel::RGBF64,
-            resize::Type::Point,
+            match self.resizer {
+                resize::Type::Point => resize::Type::Point,
+                resize::Type::Triangle => resize::Type::Triangle,
+                resize::Type::Catrom => resize::Type::Catrom,
+                resize::Type::Mitchell => resize::Type::Mitchell,
+                resize::Type::Lanczos3 => resize::Type::Lanczos3,
+                _ => panic!(),
+            },
         )
         .resize(input.data(), output_data.as_mut_slice());
 
