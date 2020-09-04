@@ -2,7 +2,7 @@ use rayon::prelude::*;
 use std::{convert::TryInto, env::args, fs::File, io::prelude::*};
 
 use pixlproc::{
-    processor::{InvertProcessor, Processor},
+    processor::{InvertProcessor, Processor, ResizeProcessor},
     RGB,
 };
 
@@ -42,8 +42,10 @@ fn main() {
         raw_image.height(),
         raw_image.data().iter().copied(),
     );
-    let inverter = InvertProcessor::new();
-    let output = inverter.process(vec![image]).pop().unwrap();
+    let mut proc = ResizeProcessor::new();
+    proc.width = Some(1024);
+    //proc.resizer = pixlproc::processor::resize::Type::Lanczos3;
+    let output = proc.process(vec![image]).pop().unwrap();
 
     let file = File::create("./out.png").expect("Could not open output file");
     let mut encoder = png::Encoder::new(
