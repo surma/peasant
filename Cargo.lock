@@ -437,9 +437,9 @@ checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 
 [[package]]
 name = "resize"
-version = "0.5.2"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "827eed9602c62e0f72a25105963d5c0775665cb228deb6426fddf7fde7db8939"
+checksum = "553eb95a65d3b072f005d1933b15cbe1f6e6bb084bc7c8f31a5f8fd27a3b1597"
 dependencies = [
  "rgb",
 ]

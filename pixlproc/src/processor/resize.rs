@@ -18,6 +18,17 @@ impl ResizeProcessor {
             resizer: resize::Type::Point,
         }
     }
+    pub fn with_width(width: usize) -> Self {
+        let mut l = Self::new();
+        l.width = Some(width);
+        l
+    }
+
+    pub fn with_height(height: usize) -> Self {
+        let mut l = Self::new();
+        l.height = Some(height);
+        l
+    }
 }
 
 impl Processor for ResizeProcessor {
@@ -47,7 +58,7 @@ impl Processor for ResizeProcessor {
             dst_width,
             dst_height,
             resize::Pixel::RGBF64,
-            resize::Type::Triangle,
+            resize::Type::Point,
         )
         .resize(input.data(), output_data.as_mut_slice());
 

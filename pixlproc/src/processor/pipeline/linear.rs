@@ -7,7 +7,7 @@ pub struct LinearPipeline<T: Processor> {
 }
 
 impl<T: Processor> LinearPipeline<T> {
-    pub fn new() -> LinearPipeline<T> {
+    pub fn new() -> Self {
         LinearPipeline {
             pipeline: Vec::new(),
         }

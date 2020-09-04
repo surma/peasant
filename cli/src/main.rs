@@ -69,12 +69,10 @@ fn main() {
         raw_image.data().iter().copied(),
     );
     let mut proc = LinearPipeline::<KnownProcessor>::new();
-    proc.push({
-        let mut proc = ResizeProcessor::new();
-        proc.width = Some(1024);
-        KnownProcessor::ResizeProcessor_(proc)
-    });
-    proc.push({ KnownProcessor::InvertProcessor_(InvertProcessor::new()) });
+    proc.push(KnownProcessor::ResizeProcessor_(
+        ResizeProcessor::with_width(1024),
+    ));
+    proc.push(KnownProcessor::InvertProcessor_(InvertProcessor::new()));
     let output = proc.process(vec![image]).pop().unwrap();
 
     let file = File::create("./out.png").expect("Could not open output file");
