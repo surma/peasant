@@ -18,29 +18,114 @@ await (async () => {
 
 export async function process(img) {
   const size = img.data.byteLength;
-  const gpuInputBuffer = device.createBuffer({
+  const imageInputBuffer = device.createBuffer({
     mappedAtCreation: true,
     size,
-    usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
+    usage: GPUBufferUsage.STORAGE,
   });
-  const arrayBuffer = gpuInputBuffer.getMappedRange();
+  const arrayBuffer = imageInputBuffer.getMappedRange();
   new Float32Array(arrayBuffer).set(img.data);
-  gpuInputBuffer.unmap();
+  imageInputBuffer.unmap();
 
-  const gpuOutputBuffer = device.createBuffer({
+  const imageOutputBuffer = device.createBuffer({
     size,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   });
 
-  const copyEncoder = device.createCommandEncoder();
-  copyEncoder.copyBufferToBuffer(gpuInputBuffer, 0, gpuOutputBuffer, 0, size);
-  const copyCommands = copyEncoder.finish();
-  device.queue.submit([copyCommands]);
+  const gpuReadBuffer = device.createBuffer({
+    size,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  });
 
-  await gpuOutputBuffer.mapAsync(GPUMapMode.READ);
-  const copyArrayBuffer = gpuOutputBuffer.getMappedRange();
+  const bindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "read-only-storage",
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+    ],
+  });
+
+  const bindGroup = device.createBindGroup({
+    layout: bindGroupLayout,
+    entries: [
+      {
+        binding: 0,
+        resource: {
+          buffer: imageInputBuffer,
+        },
+      },
+      {
+        binding: 1,
+        resource: {
+          buffer: imageOutputBuffer,
+        },
+      },
+    ],
+  });
+
+  const shaderModule = device.createShaderModule({
+    code: `
+			struct Image {
+				pixel: array<f32>;
+			};
+
+			[[group(0), binding(0)]] var<storage, read> input: Image;
+			[[group(0), binding(1)]] var<storage, write> output: Image;
+	
+			// IDK?!?!
+			[[stage(compute), workgroup_size(16, 16)]]
+			fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
+				let index = global_id.x * 65536u + global_id.y;
+				output.pixel[index] = 1. - input.pixel[index];
+			}
+		`,
+  });
+
+  const computePipeline = device.createComputePipeline({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout],
+    }),
+    compute: {
+      module: shaderModule,
+      entryPoint: "main",
+    },
+  });
+
+  const commandEncoder = device.createCommandEncoder();
+  const passEncoder = commandEncoder.beginComputePass();
+  passEncoder.setPipeline(computePipeline);
+  passEncoder.setBindGroup(0, bindGroup);
+  const numPixels = size;
+  const x = Math.floor(numPixels / 65536);
+  const y = numPixels % 65536;
+  passEncoder.dispatch(x, y);
+  passEncoder.endPass();
+  commandEncoder.copyBufferToBuffer(
+    imageOutputBuffer,
+    0,
+    gpuReadBuffer,
+    0,
+    size
+  );
+
+  const commands = commandEncoder.finish();
+  device.queue.submit([commands]);
+
+  await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+  const copyArrayBuffer = gpuReadBuffer.getMappedRange();
   const data = new Float32Array(copyArrayBuffer).slice();
-  gpuOutputBuffer.unmap();
+  gpuReadBuffer.unmap();
   return {
     ...img,
     data,
