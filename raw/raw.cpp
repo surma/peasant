@@ -22,17 +22,23 @@ void extract_meta(val &data, LibRaw &imageproc, libraw_processed_image_t *img) {
   data.set("aperture", imageproc.imgdata.other.aperture);
   data.set("shutter", imageproc.imgdata.other.shutter);
   data.set("flip", imageproc.imgdata.sizes.flip);
+  data.set("colors", img->colors);
+  data.set("bits", img->bits);
 }
 
 int demosaic(LibRaw &imageproc) {
+  // 16 bit per channel
   imageproc.output_params_ptr()->output_bps = 16;
 
-  // Disable processing
+  // Disable some processing
   imageproc.output_params_ptr()->no_auto_bright = 1;
   imageproc.output_params_ptr()->use_camera_wb = 0;
+  // Don’t apply rotation
+  imageproc.output_params_ptr()->user_flip = 0;
 
-  // sRGB as output space
-  imageproc.output_params_ptr()->output_color =  std::__to_underlying(ColorSpace::XYZ);
+  // XYZ as output space
+  imageproc.output_params_ptr()->output_color =
+      std::__to_underlying(ColorSpace::XYZ);
 
   // No crop, I guess?
   imageproc.output_params_ptr()->cropbox[0] = 0;
@@ -40,9 +46,6 @@ int demosaic(LibRaw &imageproc) {
   imageproc.output_params_ptr()->cropbox[2] = imageproc.imgdata.sizes.raw_width;
   imageproc.output_params_ptr()->cropbox[3] =
       imageproc.imgdata.sizes.raw_height;
-
-  // Don’t apply rotation
-  imageproc.output_params_ptr()->user_flip = 0;
 
   return imageproc.dcraw_process();
 }
@@ -63,10 +66,11 @@ val decode(std::string data) {
 
   auto result = val::object();
   extract_meta(result, imageproc, image);
-  result.set("colors", image->colors);
-  result.set("bits", image->bits);
 
-  result.set("data", val(typed_memory_view(image->data_size / 2, reinterpret_cast<uint16_t*>(image->data))));
+  result.set("data",
+             val(typed_memory_view(image->data_size / 2,
+                                   // Yes this is correct lol
+                                   reinterpret_cast<uint16_t *>(image->data))));
 
   LibRaw::dcraw_clear_mem(image);
   return result;

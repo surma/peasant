@@ -126,15 +126,15 @@ async function init(input) {
         var ret = getObject(arg0).buffer;
         return addHeapObject(ret);
     };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_63181699967b1b75 = function(arg0, arg1, arg2) {
-        var ret = new Uint16Array(getObject(arg0), arg1 >>> 0, arg2 >>> 0);
+    imports.wbg.__wbg_newwithbyteoffsetandlength_8bd669b4092b7244 = function(arg0, arg1, arg2) {
+        var ret = new Float32Array(getObject(arg0), arg1 >>> 0, arg2 >>> 0);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
         takeObject(arg0);
     };
-    imports.wbg.__wbg_new_848f6373a4676214 = function(arg0) {
-        var ret = new Uint16Array(getObject(arg0));
+    imports.wbg.__wbg_new_8b45a9becdb89691 = function(arg0) {
+        var ret = new Float32Array(getObject(arg0));
         return addHeapObject(ret);
     };
     imports.wbg.__wbg_push_284486ca27c6aa8b = function(arg0, arg1) {
