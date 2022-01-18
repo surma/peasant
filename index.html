@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<style>
+  canvas {
+    width: 100%;
+  }
+</style>
+<h1>lol</h1>
+<input type="file" id="f" />
+<canvas id="c"></canvas>
+<script type="module">
+  import factory from "./raw/build/raw.js";
+
+  const { f, c } = document.all;
+
+  const m = await factory();
+  await m.ready;
+  f.addEventListener("change", async (ev) => {
+    if (ev.target.files.length <= 0) return;
+    const buffer = await new Response(ev.target.files[0]).arrayBuffer();
+    const img = m.decode(new Uint8Array(buffer));
+    const imgData = new ImageData(img.width, img.height);
+    for (let y = 0; y < img.height; y++) {
+      for (let x = 0; x < img.width; x++) {
+        imgData.data[4 * (y * img.width + x) + 0] =
+          img.data[3 * (y * img.width + x) + 0];
+        imgData.data[4 * (y * img.width + x) + 1] =
+          img.data[3 * (y * img.width + x) + 1];
+        imgData.data[4 * (y * img.width + x) + 2] =
+          img.data[3 * (y * img.width + x) + 2];
+        imgData.data[4 * (y * img.width + x) + 3] = 255;
+      }
+    }
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext("2d");
+    ctx.putImageData(imgData, 0, 0);
+    console.log(img);
+  });
+  // console.log(m.decode);
+</script>
