@@ -9,32 +9,54 @@
 <canvas id="c"></canvas>
 <script type="module">
   import factory from "./raw/build/raw.js";
+  import init, { resize_u16 } from "./resize/pkg/resize.js";
 
   const { f, c } = document.all;
 
   const m = await factory();
   await m.ready;
+  await init();
   f.addEventListener("change", async (ev) => {
     if (ev.target.files.length <= 0) return;
     const buffer = await new Response(ev.target.files[0]).arrayBuffer();
-    const img = m.decode(new Uint8Array(buffer));
+    let img = m.decode(new Uint8Array(buffer));
+
+    console.log(img);
+    img = resize(img, 0.2);
+    console.log(img);
+    const imgData = toImageData(img);
+    c.width = imgData.width;
+    c.height = imgData.height;
+    const ctx = c.getContext("2d");
+    ctx.putImageData(imgData, 0, 0);
+  });
+
+  function resize(img, factor) {
+    const result = resize_u16(img.data, img.width, img.height, factor, 0);
+    console.log({ result });
+    const [data, width, height] = result;
+    return {
+      ...img,
+      width,
+      height,
+      data,
+    };
+  }
+
+  function toImageData(img) {
     const imgData = new ImageData(img.width, img.height);
     for (let y = 0; y < img.height; y++) {
       for (let x = 0; x < img.width; x++) {
         imgData.data[4 * (y * img.width + x) + 0] =
-          img.data[3 * (y * img.width + x) + 0];
+          img.data[3 * (y * img.width + x) + 0] >> 8;
         imgData.data[4 * (y * img.width + x) + 1] =
-          img.data[3 * (y * img.width + x) + 1];
+          img.data[3 * (y * img.width + x) + 1] >> 8;
         imgData.data[4 * (y * img.width + x) + 2] =
-          img.data[3 * (y * img.width + x) + 2];
+          img.data[3 * (y * img.width + x) + 2] >> 8;
         imgData.data[4 * (y * img.width + x) + 3] = 255;
       }
     }
-    c.width = img.width;
-    c.height = img.height;
-    const ctx = c.getContext("2d");
-    ctx.putImageData(imgData, 0, 0);
-    console.log(img);
-  });
+    return imgData;
+  }
   // console.log(m.decode);
 </script>

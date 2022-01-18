@@ -25,7 +25,7 @@ void extract_meta(val &data, LibRaw &imageproc, libraw_processed_image_t *img) {
 }
 
 int demosaic(LibRaw &imageproc) {
-  imageproc.output_params_ptr()->output_bps = 8;
+  imageproc.output_params_ptr()->output_bps = 16;
 
   // Disable processing
   imageproc.output_params_ptr()->no_auto_bright = 1;
@@ -65,7 +65,8 @@ val decode(std::string data) {
   extract_meta(result, imageproc, image);
   result.set("colors", image->colors);
   result.set("bits", image->bits);
-  result.set("data", val(typed_memory_view(image->data_size, image->data)));
+
+  result.set("data", val(typed_memory_view(image->data_size / 2, reinterpret_cast<uint16_t*>(image->data))));
 
   LibRaw::dcraw_clear_mem(image);
   return result;
