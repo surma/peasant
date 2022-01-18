@@ -32,7 +32,7 @@ int demosaic(LibRaw &imageproc) {
   imageproc.output_params_ptr()->use_camera_wb = 0;
 
   // sRGB as output space
-  imageproc.output_params_ptr()->output_color =  std::__to_underlying(ColorSpace::sRGB);
+  imageproc.output_params_ptr()->output_color =  std::__to_underlying(ColorSpace::XYZ);
 
   // No crop, I guess?
   imageproc.output_params_ptr()->cropbox[0] = 0;
