@@ -87,11 +87,9 @@ export async function process(img) {
         return vec3(1.) - color;
       }
 
-      // Workgroup size doesn’t _really_ matter as we are relying
-      // on the global invocation ID. But it seems to break with 1,1,1?
-      [[stage(compute), workgroup_size(16, 16)]]
+      [[stage(compute), workgroup_size(256)]]
       fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
-        let index = global_id.x * 65536u + global_id.y;
+        let index = global_id.x;
         let color = vec3(
           input.pixel[3u*index + 0u],
           input.pixel[3u*index + 1u],
@@ -120,9 +118,7 @@ export async function process(img) {
   passEncoder.setPipeline(computePipeline);
   passEncoder.setBindGroup(0, bindGroup);
   const numPixels = size / 3;
-  const x = Math.floor(numPixels / 65536);
-  const y = numPixels % 65536;
-  passEncoder.dispatch(x, y);
+  passEncoder.dispatch(Math.ceil(numPixels / 256));
   passEncoder.endPass();
   commandEncoder.copyBufferToBuffer(
     imageOutputBuffer,
