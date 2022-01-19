@@ -76,20 +76,33 @@ export async function process(img) {
 
   const shaderModule = device.createShaderModule({
     code: `
-			struct Image {
-				pixel: array<f32>;
-			};
+      struct Image {
+        pixel: array<f32>;
+      };
 
-			[[group(0), binding(0)]] var<storage, read> input: Image;
-			[[group(0), binding(1)]] var<storage, write> output: Image;
-	
-			// IDK?!?!
-			[[stage(compute), workgroup_size(16, 16)]]
-			fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
-				let index = global_id.x * 65536u + global_id.y;
-				output.pixel[index] = 1. - input.pixel[index];
-			}
-		`,
+      [[group(0), binding(0)]] var<storage, read> input: Image;
+      [[group(0), binding(1)]] var<storage, write> output: Image;
+  
+      fn shade(color: vec3<f32>) -> vec3<f32> {
+        return vec3(1.) - color;
+      }
+
+      // Workgroup size doesn’t _really_ matter as we are relying
+      // on the global invocation ID. But it seems to break with 1,1,1?
+      [[stage(compute), workgroup_size(16, 16)]]
+      fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
+        let index = global_id.x * 65536u + global_id.y;
+        let color = vec3(
+          input.pixel[3u*index + 0u],
+          input.pixel[3u*index + 1u],
+          input.pixel[3u*index + 2u],
+        );
+        let newColor = shade(color);
+        output.pixel[3u*index + 0u] = newColor.r;
+        output.pixel[3u*index + 1u] = newColor.g;
+        output.pixel[3u*index + 2u] = newColor.b;
+      }
+    `,
   });
 
   const computePipeline = device.createComputePipeline({
@@ -106,7 +119,7 @@ export async function process(img) {
   const passEncoder = commandEncoder.beginComputePass();
   passEncoder.setPipeline(computePipeline);
   passEncoder.setBindGroup(0, bindGroup);
-  const numPixels = size;
+  const numPixels = size / 3;
   const x = Math.floor(numPixels / 65536);
   const y = numPixels % 65536;
   passEncoder.dispatch(x, y);
