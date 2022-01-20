@@ -91,16 +91,33 @@ export async function process(img) {
         return vec3(1.) - color;
       }
 
+      let xyz_to_srgb = mat3x3<f32>(
+        3.2406, -0.9689, 0.0557,
+        -1.5372, 1.8758, -0.2040,
+        -0.4986, 0.0415, 1.0570
+      );
+      
+      fn srgb(color: vec3<f32>) -> vec3<f32> {
+        let new_color = xyz_to_srgb * color;
+        return 1.055 * pow(new_color, vec3(1./2.4)) - 0.055;
+      }
+
       [[stage(compute), workgroup_size(256)]]
       fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
         let index = global_id.x;
-        let color = vec3(
+        // PFF idk why this isn’t compiling.
+        // let length = arrayLength(input.pixel);
+        // if(index >= length) {
+        //   return;
+        // }
+        var color = vec3(
           input.pixel[3u*index + 0u],
           input.pixel[3u*index + 1u],
           input.pixel[3u*index + 2u],
         );
-        let newColor = shade(color);
-        output.pixel[index] = (u32(newColor.r * 255.) << 0u) |  (u32(newColor.g * 255.) << 8u) | (u32(newColor.b * 255.) << 16u) | (255u << 24u);
+        // color = shade(color);
+        color = srgb(color);
+        output.pixel[index] = (u32(color.r * 255.) << 0u) | (u32(color.g * 255.) << 8u) | (u32(color.b * 255.) << 16u) | (255u << 24u);
       }
     `,
   });
