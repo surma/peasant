@@ -10,9 +10,7 @@ f.addEventListener("change", async (ev) => {
   const buffer = await new Response(ev.target.files[0]).arrayBuffer();
   let img = decode(buffer);
   img = resize(img, 0.2);
-  console.log("Preprocess", img);
   img = await process(img);
-  console.log("Postprocess", img);
   showImage(img, c1);
 });
 

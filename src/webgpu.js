@@ -23,8 +23,8 @@ export async function process(img) {
     size: numPixels * 3 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
-  const arrayBuffer = imageInputBuffer.getMappedRange();
-  new Float32Array(arrayBuffer).set(img.data);
+  const imageInputArrayBuffer = imageInputBuffer.getMappedRange();
+  new Float32Array(imageInputArrayBuffer).set(img.data);
   imageInputBuffer.unmap();
 
   const imageOutputBuffer = device.createBuffer({
@@ -36,6 +36,15 @@ export async function process(img) {
     size: numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   });
+
+  const uniformsBuffer = device.createBuffer({
+    mappedAtCreation: true,
+    size: 4 * Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.UNIFORM,
+  });
+  const uniformsArrayBuffer = uniformsBuffer.getMappedRange();
+  new Float32Array(uniformsArrayBuffer).set([0.0, 0.01, 0.0, 0]);
+  uniformsBuffer.unmap();
 
   const bindGroupLayout = device.createBindGroupLayout({
     entries: [
@@ -51,6 +60,13 @@ export async function process(img) {
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage",
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
         },
       },
     ],
@@ -71,6 +87,12 @@ export async function process(img) {
           buffer: imageOutputBuffer,
         },
       },
+      {
+        binding: 2,
+        resource: {
+          buffer: uniformsBuffer,
+        },
+      },
     ],
   });
 
@@ -84,11 +106,17 @@ export async function process(img) {
         pixel: array<u32>;
       };
 
+      struct Uniforms {
+        offset: vec4<f32>;
+      };
+
       [[group(0), binding(0)]] var<storage, read> input: ImageF32;
       [[group(0), binding(1)]] var<storage, write> output: ImageU8;
+      [[group(0), binding(2)]] var<uniform> uniforms: Uniforms;
   
       fn shade(color: vec3<f32>) -> vec3<f32> {
-        return vec3(1.) - color;
+        // return uniforms.offset.rgb;
+        return color + uniforms.offset.rgb;
       }
 
       let xyz_to_srgb = mat3x3<f32>(
@@ -113,7 +141,7 @@ export async function process(img) {
           input.pixel[3u*index + 1u],
           input.pixel[3u*index + 2u],
         );
-        // color = shade(color);
+        color = shade(color);
         color = srgb(color);
         output.pixel[index] = (u32(color.r * 255.) << 0u) | (u32(color.g * 255.) << 8u) | (u32(color.b * 255.) << 16u) | (255u << 24u);
       }
