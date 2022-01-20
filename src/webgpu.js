@@ -17,10 +17,10 @@ await (async () => {
 })();
 
 export async function process(img) {
-  const size = img.data.byteLength;
+  const numPixels = img.data.length / 3;
   const imageInputBuffer = device.createBuffer({
     mappedAtCreation: true,
-    size,
+    size: numPixels * 3 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
   const arrayBuffer = imageInputBuffer.getMappedRange();
@@ -28,12 +28,12 @@ export async function process(img) {
   imageInputBuffer.unmap();
 
   const imageOutputBuffer = device.createBuffer({
-    size,
+    size: numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   });
 
   const gpuReadBuffer = device.createBuffer({
-    size,
+    size: numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   });
 
@@ -76,12 +76,16 @@ export async function process(img) {
 
   const shaderModule = device.createShaderModule({
     code: `
-      struct Image {
+      struct ImageF32 {
         pixel: array<f32>;
       };
 
-      [[group(0), binding(0)]] var<storage, read> input: Image;
-      [[group(0), binding(1)]] var<storage, write> output: Image;
+      struct ImageU8 {
+        pixel: array<u32>;
+      };
+
+      [[group(0), binding(0)]] var<storage, read> input: ImageF32;
+      [[group(0), binding(1)]] var<storage, write> output: ImageU8;
   
       fn shade(color: vec3<f32>) -> vec3<f32> {
         return vec3(1.) - color;
@@ -96,9 +100,7 @@ export async function process(img) {
           input.pixel[3u*index + 2u],
         );
         let newColor = shade(color);
-        output.pixel[3u*index + 0u] = newColor.r;
-        output.pixel[3u*index + 1u] = newColor.g;
-        output.pixel[3u*index + 2u] = newColor.b;
+        output.pixel[index] = (u32(newColor.r * 255.) << 0u) |  (u32(newColor.g * 255.) << 8u) | (u32(newColor.b * 255.) << 16u) | (255u << 24u);
       }
     `,
   });
@@ -117,7 +119,6 @@ export async function process(img) {
   const passEncoder = commandEncoder.beginComputePass();
   passEncoder.setPipeline(computePipeline);
   passEncoder.setBindGroup(0, bindGroup);
-  const numPixels = size / 3;
   passEncoder.dispatch(Math.ceil(numPixels / 256));
   passEncoder.endPass();
   commandEncoder.copyBufferToBuffer(
@@ -125,7 +126,7 @@ export async function process(img) {
     0,
     gpuReadBuffer,
     0,
-    size
+    numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT
   );
 
   const commands = commandEncoder.finish();
@@ -133,7 +134,7 @@ export async function process(img) {
 
   await gpuReadBuffer.mapAsync(GPUMapMode.READ);
   const copyArrayBuffer = gpuReadBuffer.getMappedRange();
-  const data = new Float32Array(copyArrayBuffer).slice();
+  const data = new Uint8ClampedArray(copyArrayBuffer).slice();
   gpuReadBuffer.unmap();
   return {
     ...img,

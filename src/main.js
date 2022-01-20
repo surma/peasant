@@ -17,7 +17,7 @@ f.addEventListener("change", async (ev) => {
 });
 
 function showImage(img, c) {
-  const imgData = toImageData(img);
+  const imgData = new ImageData(img.data, img.width, img.height);
   c.width = imgData.width;
   c.height = imgData.height;
   const ctx = c.getContext("2d");
