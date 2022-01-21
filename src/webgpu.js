@@ -99,7 +99,7 @@ export async function process(img) {
   const shaderModule = device.createShaderModule({
     code: `
       struct ImageF32 {
-        pixel: array<f32>;
+        pixel: array<vec4<f32>>;
       };
 
       struct ImageU8 {
@@ -114,20 +114,19 @@ export async function process(img) {
       [[group(0), binding(1)]] var<storage, write> output: ImageU8;
       [[group(0), binding(2)]] var<uniform> uniforms: Uniforms;
   
-      fn shade(color: vec3<f32>) -> vec3<f32> {
-        // return uniforms.offset.rgb;
-        return color + uniforms.offset.rgb;
+      fn shade(color: vec4<f32>) -> vec4<f32> {
+        return color + uniforms.offset;
       }
 
-      let xyz_to_srgb = mat3x3<f32>(
+      let xyz_to_linear_srgb = mat3x3<f32>(
         3.2406, -0.9689, 0.0557,
         -1.5372, 1.8758, -0.2040,
         -0.4986, 0.0415, 1.0570
       );
 
-      fn srgb(color: vec3<f32>) -> vec3<f32> {
-        let new_color = xyz_to_srgb * color;
-        return 1.055 * pow(new_color, vec3(1./2.4)) - 0.055;
+      fn srgb(color: vec4<f32>) -> vec4<f32> {
+        let linear_srgb = xyz_to_linear_srgb * color.rgb;
+        return vec4(1.055 * pow(linear_srgb, vec3(1./2.4)) - 0.055, color.a);
       }
 
       [[stage(compute), workgroup_size(256)]]
@@ -136,14 +135,12 @@ export async function process(img) {
         if(index >= arrayLength(&input.pixel)) {
           return;
         }
-        var color = vec3(
-          input.pixel[4u*index + 0u],
-          input.pixel[4u*index + 1u],
-          input.pixel[4u*index + 2u],
-        );
+        var color = input.pixel[index];
         color = shade(color);
         color = srgb(color);
-        output.pixel[index] = (u32(color.r * 255.) << 0u) | (u32(color.g * 255.) << 8u) | (u32(color.b * 255.) << 16u) | (255u << 24u);
+        // Manual conversion from vec4<[0. to 1.]> to vec4<[0 to 255]>
+        color = clamp(color, vec4(0.), vec4(1.)) * 255.;
+        output.pixel[index] = (u32(color.r) << 0u) | (u32(color.g) << 8u) | (u32(color.b) << 16u) | (u32(color.a) << 24u);
       }
     `,
   });
