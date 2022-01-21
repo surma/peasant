@@ -1,17 +1,21 @@
+function totalAbort(msg) {
+  document.body.innerHTML = `<pre class="error">${msg}</pre>`;
+}
+
 let device;
 await (async () => {
   if (!("gpu" in navigator)) {
-    console.error("WebGPU is not supported.");
+    totalAbort("WebGPU is not supported.");
     return;
   }
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) {
-    console.error("Couldn’t request WebGPU adapter.");
+    totalAbort("Couldn’t request WebGPU adapter.");
     return;
   }
   device = await adapter.requestDevice();
   if (!device) {
-    console.error("Couldn’t request WebGPU device.");
+    totalAbort("Couldn’t request WebGPU device.");
     return;
   }
 })();

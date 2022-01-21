@@ -1,0 +1,18 @@
+{
+  "name": "peasant",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "vite build -c vite.config.js --outDir ../dist src",
+    "dev": "vite -c vite.config.js src"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/surma/peasant.git"
+  },
+  "keywords": [],
+  "author": "Surma <surma@surma.dev>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "vite": "^2.7.13"
+  }
+}

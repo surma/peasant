@@ -13,12 +13,12 @@ void extract_meta(val &data, LibRaw &imageproc, libraw_processed_image_t *img) {
   auto height = imageproc.imgdata.sizes.height;
   auto size = width * height;
 
-  data.set("raw_width", imageproc.imgdata.sizes.raw_width);
-  data.set("raw_height", imageproc.imgdata.sizes.raw_height);
+  data.set("rawWidth", imageproc.imgdata.sizes.raw_width);
+  data.set("rawHeight", imageproc.imgdata.sizes.raw_height);
   data.set("width", width);
   data.set("height", height);
   data.set("iso", imageproc.imgdata.other.iso_speed);
-  data.set("focal_length", imageproc.imgdata.other.focal_len);
+  data.set("focalLength", imageproc.imgdata.other.focal_len);
   data.set("aperture", imageproc.imgdata.other.aperture);
   data.set("shutter", imageproc.imgdata.other.shutter);
   data.set("flip", imageproc.imgdata.sizes.flip);
