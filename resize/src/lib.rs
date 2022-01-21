@@ -26,7 +26,7 @@ impl Rgb {
 
 impl resize::PixelFormat for Rgb {
     type InputPixel = rgb::RGB<u16>;
-    type OutputPixel = rgb::RGB<f32>;
+    type OutputPixel = rgb::RGBA<f32>;
     type Accumulator = rgb::RGB<f32>;
 
     fn new() -> Self::Accumulator {
@@ -46,7 +46,7 @@ impl resize::PixelFormat for Rgb {
     }
 
     fn into_pixel(&self, acc: Self::Accumulator) -> Self::OutputPixel {
-        acc
+        rgb::RGBA::new(acc.r, acc.g, acc.b, 1.0)
     }
 }
 
@@ -78,16 +78,15 @@ pub fn resize_u16(
         input_height,
         output_width,
         output_height,
-        // resize::Pixel::RGB16,
         Rgb::new(),
         resize_algo,
     )
     .unwrap();
-    let output_size = output_width * output_height * 3;
+    let output_size = output_width * output_height * 4;
     let mut output_image: Vec<f32> = Vec::with_capacity(output_size);
     output_image.resize(output_size, 0.0);
     let input_pixels: &[rgb::RGB<u16>] = input_image.as_slice().as_pixels();
-    let output_pixels: &mut [rgb::RGB<f32>] = output_image.as_mut_slice().as_pixels_mut();
+    let output_pixels: &mut [rgb::RGBA<f32>] = output_image.as_mut_slice().as_pixels_mut();
     resizer.resize(input_pixels, output_pixels).unwrap();
 
     let result = js_sys::Array::new();

@@ -1,7 +1,6 @@
 import { decode } from "./raw-decoder.js";
 import { resize } from "./resizer.js";
 import { process } from "./webgpu.js";
-import { toImageData } from "./image-data-utils.js";
 
 const { f, c1 } = document.all;
 

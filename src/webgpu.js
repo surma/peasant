@@ -17,10 +17,10 @@ await (async () => {
 })();
 
 export async function process(img) {
-  const numPixels = img.data.length / 3;
+  const numPixels = img.data.length / 4;
   const imageInputBuffer = device.createBuffer({
     mappedAtCreation: true,
-    size: numPixels * 3 * Float32Array.BYTES_PER_ELEMENT,
+    size: numPixels * 4 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE,
   });
   const imageInputArrayBuffer = imageInputBuffer.getMappedRange();
@@ -137,9 +137,9 @@ export async function process(img) {
           return;
         }
         var color = vec3(
-          input.pixel[3u*index + 0u],
-          input.pixel[3u*index + 1u],
-          input.pixel[3u*index + 2u],
+          input.pixel[4u*index + 0u],
+          input.pixel[4u*index + 1u],
+          input.pixel[4u*index + 2u],
         );
         color = shade(color);
         color = srgb(color);
