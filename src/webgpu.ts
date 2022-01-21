@@ -1,3 +1,5 @@
+/// <reference types="@webgpu/types" />
+
 function totalAbort(msg) {
   document.body.innerHTML = `<pre class="error">${msg}</pre>`;
 }

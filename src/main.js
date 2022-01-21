@@ -1,5 +1,5 @@
 import { decode } from "./raw-decoder.ts";
-import { process } from "./webgpu.js";
+import { process } from "./webgpu.ts";
 
 const { f, c1 } = document.all;
 const ctx = c1.getContext("2d");

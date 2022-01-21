@@ -14,5 +14,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "vite": "^2.7.13"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.9"
   }
 }
