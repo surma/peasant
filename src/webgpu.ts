@@ -5,7 +5,8 @@ import { Node, NodeParams } from "./dag.ts";
 import type { Image } from "./image.js";
 
 // @ts-ignore
-import shaderSrc from "./shader.wgsl?raw";
+import colorspacesSrc from "./wgsl/colorspaces.wgsl?raw";
+import shaderSrc from "./wgsl/shader.wgsl?raw";
 
 function totalAbort(msg) {
   document.body.innerHTML = `<pre class="error">${msg}</pre>`;
@@ -110,7 +111,10 @@ export function ShaderNode(img: Image, offset: Array<Node<any, number>>) {
   });
 
   const shaderModule = device.createShaderModule({
-    code: shaderSrc,
+    code: [
+      colorspacesSrc,
+      shaderSrc
+    ].join("\n")
   });
 
   const computePipeline = device.createComputePipeline({
