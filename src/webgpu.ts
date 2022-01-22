@@ -1,10 +1,17 @@
 /// <reference types="@webgpu/types" />
 
+import { Node, NodeParams } from "./dag.ts";
+
+import type { Image } from "./image.js";
+
+// @ts-ignore
+import shaderSrc from "./shader.wgsl?raw";
+
 function totalAbort(msg) {
   document.body.innerHTML = `<pre class="error">${msg}</pre>`;
 }
 
-let device;
+let device: GPUDevice;
 await (async () => {
   if (!("gpu" in navigator)) {
     totalAbort("WebGPU is not supported.");
@@ -22,7 +29,7 @@ await (async () => {
   }
 })();
 
-export async function process(img) {
+export function ShaderNode(img: Image, offset: Array<Node<any, number>>) {
   const numPixels = img.data.length / 4;
   const imageInputBuffer = device.createBuffer({
     mappedAtCreation: true,
@@ -46,10 +53,10 @@ export async function process(img) {
   const uniformsBuffer = device.createBuffer({
     mappedAtCreation: true,
     size: 4 * Float32Array.BYTES_PER_ELEMENT,
-    usage: GPUBufferUsage.UNIFORM,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
   const uniformsArrayBuffer = uniformsBuffer.getMappedRange();
-  new Float32Array(uniformsArrayBuffer).set([0.0, 0.01, 0.0, 0]);
+  new Float32Array(uniformsArrayBuffer).set([0.0, 0.0, 0.0, 0]);
   uniformsBuffer.unmap();
 
   const bindGroupLayout = device.createBindGroupLayout({
@@ -103,52 +110,7 @@ export async function process(img) {
   });
 
   const shaderModule = device.createShaderModule({
-    code: `
-      struct ImageF32 {
-        pixel: array<vec4<f32>>;
-      };
-
-      struct ImageU8 {
-        pixel: array<u32>;
-      };
-
-      struct Uniforms {
-        offset: vec4<f32>;
-      };
-
-      [[group(0), binding(0)]] var<storage, read> input: ImageF32;
-      [[group(0), binding(1)]] var<storage, write> output: ImageU8;
-      [[group(0), binding(2)]] var<uniform> uniforms: Uniforms;
-  
-      fn shade(color: vec4<f32>) -> vec4<f32> {
-        return color + uniforms.offset;
-      }
-
-      let xyz_to_linear_srgb = mat3x3<f32>(
-        3.2406, -0.9689, 0.0557,
-        -1.5372, 1.8758, -0.2040,
-        -0.4986, 0.0415, 1.0570
-      );
-
-      fn srgb(color: vec4<f32>) -> vec4<f32> {
-        let linear_srgb = xyz_to_linear_srgb * color.rgb;
-        return vec4(1.055 * pow(linear_srgb, vec3(1./2.4)) - 0.055, color.a);
-      }
-
-      [[stage(compute), workgroup_size(256)]]
-      fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
-        let index = global_id.x;
-        if(index >= arrayLength(&input.pixel)) {
-          return;
-        }
-        var color = input.pixel[index];
-        color = shade(color);
-        color = srgb(color);
-        // Manual conversion from vec4<[0. to 1.]> to vec4<[0 to 255]>
-        color = clamp(color, vec4(0.), vec4(1.)) * 255.;
-        output.pixel[index] = (u32(color.r) << 0u) | (u32(color.g) << 8u) | (u32(color.b) << 16u) | (u32(color.a) << 24u);
-      }
-    `,
+    code: shaderSrc,
   });
 
   const computePipeline = device.createComputePipeline({
@@ -161,29 +123,40 @@ export async function process(img) {
     },
   });
 
-  const commandEncoder = device.createCommandEncoder();
-  const passEncoder = commandEncoder.beginComputePass();
-  passEncoder.setPipeline(computePipeline);
-  passEncoder.setBindGroup(0, bindGroup);
-  passEncoder.dispatch(Math.ceil(numPixels / 256));
-  passEncoder.endPass();
-  commandEncoder.copyBufferToBuffer(
-    imageOutputBuffer,
-    0,
-    gpuReadBuffer,
-    0,
-    numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT
-  );
+  return new Node<[number], Image>({
+    inputs: offset,
+    async update([x, y, z]) {
+      device.queue.writeBuffer(
+        uniformsBuffer,
+        0,
+        new Float32Array([x, y, z, 0])
+      );
 
-  const commands = commandEncoder.finish();
-  device.queue.submit([commands]);
+      const commandEncoder = device.createCommandEncoder();
+      const passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(computePipeline);
+      passEncoder.setBindGroup(0, bindGroup);
+      passEncoder.dispatch(Math.ceil(numPixels / 256));
+      passEncoder.endPass();
+      commandEncoder.copyBufferToBuffer(
+        imageOutputBuffer,
+        0,
+        gpuReadBuffer,
+        0,
+        numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT
+      );
+      const commands = commandEncoder.finish();
+      device.queue.submit([commands]);
 
-  await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-  const copyArrayBuffer = gpuReadBuffer.getMappedRange();
-  const data = new Uint8ClampedArray(copyArrayBuffer).slice();
-  gpuReadBuffer.unmap();
-  return {
-    ...img,
-    data,
-  };
+      await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+      const copyArrayBuffer = gpuReadBuffer.getMappedRange();
+      const data = new Uint8ClampedArray(copyArrayBuffer).slice();
+      gpuReadBuffer.unmap();
+
+      return {
+        ...img,
+        data,
+      };
+    },
+  });
 }

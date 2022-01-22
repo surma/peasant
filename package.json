@@ -13,6 +13,8 @@
   "author": "Surma <surma@surma.dev>",
   "license": "Apache-2.0",
   "dependencies": {
+    "observables-with-streams": "^0.6.1",
+    "preact": "^10.6.4",
     "vite": "^2.7.13"
   },
   "devDependencies": {

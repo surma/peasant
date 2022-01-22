@@ -1,5 +1,7 @@
-type InputArray<Inputs> = { [Index in keyof Inputs]: Node<any, Inputs[Index]> };
-interface NodeParams<Inputs, Output> {
+export type InputArray<Inputs> = {
+  [Index in keyof Inputs]: Node<any, Inputs[Index]>;
+};
+export interface NodeParams<Inputs, Output> {
   inputs: InputArray<Inputs>;
   init(): Promise<void>;
   update(inputs: Inputs): Promise<Output>;
