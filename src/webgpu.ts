@@ -1,11 +1,15 @@
 /// <reference types="@webgpu/types" />
 
-import { Node, NodeParams } from "./dag.ts";
+import { Node, NodeParams } from "./dag.js";
 
 import type { Image } from "./image.js";
 
+const MAX_WIDTH = 2000;
+const MAX_HEIGHT = 2000;
+
 // @ts-ignore
 import colorspacesSrc from "./wgsl/colorspaces.wgsl?raw";
+// @ts-ignore
 import shaderSrc from "./wgsl/shader.wgsl?raw";
 
 function totalAbort(msg) {
@@ -30,35 +34,27 @@ await (async () => {
   }
 })();
 
-export function ShaderNode(img: Image, offset: Array<Node<any, number>>) {
-  const numPixels = img.data.length / 4;
+export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, Node<any, number>, Node<any, number>]) {
+  const numPixels = MAX_WIDTH * MAX_HEIGHT;
   const imageInputBuffer = device.createBuffer({
-    mappedAtCreation: true,
-    size: numPixels * 4 * Float32Array.BYTES_PER_ELEMENT,
-    usage: GPUBufferUsage.STORAGE,
+    size: (numPixels * 4) * Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  const imageInputArrayBuffer = imageInputBuffer.getMappedRange();
-  new Float32Array(imageInputArrayBuffer).set(img.data);
-  imageInputBuffer.unmap();
 
   const imageOutputBuffer = device.createBuffer({
-    size: numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
+    size: (numPixels * 4) * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   });
 
   const gpuReadBuffer = device.createBuffer({
-    size: numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
+    size: (numPixels * 4) * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   });
 
   const uniformsBuffer = device.createBuffer({
-    mappedAtCreation: true,
-    size: 4 * Float32Array.BYTES_PER_ELEMENT,
+    size: 4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  const uniformsArrayBuffer = uniformsBuffer.getMappedRange();
-  new Float32Array(uniformsArrayBuffer).set([0.0, 0.0, 0.0, 0]);
-  uniformsBuffer.unmap();
 
   const bindGroupLayout = device.createBindGroupLayout({
     entries: [
@@ -127,15 +123,40 @@ export function ShaderNode(img: Image, offset: Array<Node<any, number>>) {
     },
   });
 
-  return new Node<[number], Image>({
-    inputs: offset,
-    async update([x, y, z]) {
+  // A separate node so that image uploading doesn’t happen on every update,
+  // but only when the image actually changes.
+  const imgUploaderNode = new Node<[Image], Image>({
+    inputs: [img],
+    async update([img]) {
+      device.queue.writeBuffer(
+        imageInputBuffer,
+        0,
+        img.data
+      );
+      return img;
+    }
+  });
+
+  function createUniformBuffer(width: number, height: number, x: number, y: number, z: number): ArrayBuffer {
+    const buffer = new ArrayBuffer(4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT);
+    const view = new DataView(buffer);
+    view.setUint32(0, width, true);
+    view.setUint32(4, height, true);
+    view.setFloat32(16, x, true);
+    view.setFloat32(20, y, true);
+    view.setFloat32(24, z, true);
+    view.setFloat32(28, 0, true);
+    return buffer;
+  }
+
+  return new Node<[Image, number, number, number], Image<Uint8ClampedArray>>({
+    inputs: [imgUploaderNode, ...offset ],
+    async update([img, x, y, z]) {
       device.queue.writeBuffer(
         uniformsBuffer,
         0,
-        new Float32Array([x, y, z, 0])
+        createUniformBuffer(img.width, img.height, x, y, z)
       );
-
       const commandEncoder = device.createCommandEncoder();
       const passEncoder = commandEncoder.beginComputePass();
       passEncoder.setPipeline(computePipeline);
@@ -154,7 +175,7 @@ export function ShaderNode(img: Image, offset: Array<Node<any, number>>) {
 
       await gpuReadBuffer.mapAsync(GPUMapMode.READ);
       const copyArrayBuffer = gpuReadBuffer.getMappedRange();
-      const data = new Uint8ClampedArray(copyArrayBuffer).slice();
+      const data = new Uint8ClampedArray(copyArrayBuffer).slice(0, img.width * img.height * 4);
       gpuReadBuffer.unmap();
 
       return {

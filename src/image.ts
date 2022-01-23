@@ -1,4 +1,4 @@
-export interface Image {
+export interface Image<T = Float32Array> {
   rawWidth: number;
   rawHeight: number;
   width: number;
@@ -10,5 +10,5 @@ export interface Image {
   flip: number;
   colors: number;
   bits: number;
-  data: Float32Array;
+  data: T;
 }
