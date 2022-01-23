@@ -7,7 +7,7 @@ const module = await factory();
 await module.ready;
 await init();
 
-export function decode(buffer: ArrayBuffer, scaleFactor: 0.2): Image {
+export function decode(buffer: ArrayBuffer, scaleFactor: number): Image {
   const img = module.decode(new Uint8Array(buffer));
   const [data, width, height] = resize_u16(
     img.data,

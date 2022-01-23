@@ -5,12 +5,13 @@ import { Node, singleValueNode } from "./dag.js";
 
 import type { Image } from "./image.js";
 
-const { f, c1, x, y, z } = document.all as any as {
+const { f, c1, x, y, z, scale } = document.all as any as {
   f: HTMLInputElement;
   c1: HTMLCanvasElement;
   x: HTMLInputElement;
   y: HTMLInputElement;
   z: HTMLInputElement;
+  scale: HTMLInputElement;
 };
 const ctx = c1.getContext("2d");
 ctx.fillStyle = "red";
@@ -25,9 +26,15 @@ const fileNode = new Node({
   return new Response(file).arrayBuffer();
 });
 
-const decodedImageNode = new Node({
-  inputs: [fileNode],
-  update: async ([inputBuffer]) => decode(inputBuffer, 0.2),
+const scaleNode = new Node<[], number>({
+  async update() {
+    return parseFloat(scale.value) / 100;
+  },
+});
+
+const decodedImageNode = new Node<[ArrayBuffer, number], Image>({
+  inputs: [fileNode, scaleNode],
+  update: async ([inputBuffer, scale]) => decode(inputBuffer, scale),
 });
 
 const offsetNodes = [x, y, z].map(
