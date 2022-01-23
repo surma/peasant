@@ -4,8 +4,10 @@ import { Node, NodeParams } from "./dag.js";
 
 import type { Image } from "./image.js";
 
-const MAX_WIDTH = 2000;
-const MAX_HEIGHT = 2000;
+const MAX_WIDTH = 2 ** 13;
+const MAX_HEIGHT = 2 ** 13;
+const MAX_NUM_PIXELS = MAX_WIDTH * MAX_HEIGHT;
+const MAX_BUFFER_SIZE = MAX_NUM_PIXELS * 4 * Float32Array.BYTES_PER_ELEMENT;
 
 // @ts-ignore
 import colorspacesSrc from "./wgsl/colorspaces.wgsl?raw";
@@ -27,32 +29,39 @@ await (async () => {
     totalAbort("Couldn’t request WebGPU adapter.");
     return;
   }
-  device = await adapter.requestDevice();
+  device = await adapter.requestDevice({
+    requiredLimits: {
+      maxStorageBufferBindingSize: MAX_BUFFER_SIZE,
+    },
+  });
   if (!device) {
     totalAbort("Couldn’t request WebGPU device.");
     return;
   }
 })();
 
-export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, Node<any, number>, Node<any, number>]) {
-  const numPixels = MAX_WIDTH * MAX_HEIGHT;
+export function ShaderNode(
+  img: Node<any, Image>,
+  offset: [Node<any, number>, Node<any, number>, Node<any, number>]
+) {
   const imageInputBuffer = device.createBuffer({
-    size: (numPixels * 4) * Float32Array.BYTES_PER_ELEMENT,
+    size: MAX_NUM_PIXELS * 4 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
 
   const imageOutputBuffer = device.createBuffer({
-    size: (numPixels * 4) * Uint8ClampedArray.BYTES_PER_ELEMENT,
+    size: MAX_NUM_PIXELS * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   });
 
   const gpuReadBuffer = device.createBuffer({
-    size: (numPixels * 4) * Uint8ClampedArray.BYTES_PER_ELEMENT,
+    size: MAX_NUM_PIXELS * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   });
 
   const uniformsBuffer = device.createBuffer({
-    size: 4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT,
+    size:
+      4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -107,10 +116,7 @@ export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, No
   });
 
   const shaderModule = device.createShaderModule({
-    code: [
-      colorspacesSrc,
-      shaderSrc
-    ].join("\n")
+    code: [colorspacesSrc, shaderSrc].join("\n"),
   });
 
   const computePipeline = device.createComputePipeline({
@@ -128,17 +134,21 @@ export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, No
   const imgUploaderNode = new Node<[Image], Image>({
     inputs: [img],
     async update([img]) {
-      device.queue.writeBuffer(
-        imageInputBuffer,
-        0,
-        img.data
-      );
+      device.queue.writeBuffer(imageInputBuffer, 0, img.data);
       return img;
-    }
+    },
   });
 
-  function createUniformBuffer(width: number, height: number, x: number, y: number, z: number): ArrayBuffer {
-    const buffer = new ArrayBuffer(4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT);
+  function createUniformBuffer(
+    width: number,
+    height: number,
+    x: number,
+    y: number,
+    z: number
+  ): ArrayBuffer {
+    const buffer = new ArrayBuffer(
+      4 * Uint32Array.BYTES_PER_ELEMENT + 4 * Float32Array.BYTES_PER_ELEMENT
+    );
     const view = new DataView(buffer);
     view.setUint32(0, width, true);
     view.setUint32(4, height, true);
@@ -150,8 +160,11 @@ export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, No
   }
 
   return new Node<[Image, number, number, number], Image<Uint8ClampedArray>>({
-    inputs: [imgUploaderNode, ...offset ],
+    inputs: [imgUploaderNode, ...offset],
     async update([img, x, y, z]) {
+      const numOutputPixels = img.width * img.height;
+      const numOutputBytes =
+        numOutputPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
       device.queue.writeBuffer(
         uniformsBuffer,
         0,
@@ -161,21 +174,21 @@ export function ShaderNode(img: Node<any, Image>, offset: [Node<any, number>, No
       const passEncoder = commandEncoder.beginComputePass();
       passEncoder.setPipeline(computePipeline);
       passEncoder.setBindGroup(0, bindGroup);
-      passEncoder.dispatch(Math.ceil(numPixels / 256));
+      passEncoder.dispatch(Math.ceil(numOutputPixels / 256));
       passEncoder.endPass();
       commandEncoder.copyBufferToBuffer(
         imageOutputBuffer,
         0,
         gpuReadBuffer,
         0,
-        numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT
+        numOutputBytes
       );
       const commands = commandEncoder.finish();
       device.queue.submit([commands]);
 
       await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-      const copyArrayBuffer = gpuReadBuffer.getMappedRange();
-      const data = new Uint8ClampedArray(copyArrayBuffer).slice(0, img.width * img.height * 4);
+      const copyArrayBuffer = gpuReadBuffer.getMappedRange(0, numOutputBytes);
+      const data = new Uint8ClampedArray(copyArrayBuffer).slice();
       gpuReadBuffer.unmap();
 
       return {
