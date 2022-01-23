@@ -43,7 +43,6 @@ const offsetNodes = [x, y, z].map(
 const shaderNode = ShaderNode(decodedImageNode, offsetNodes as any);
 
 const node = RenderNode(shaderNode);
-await node.pull().catch((e) => console.error(e));
 fromEvent(document.body, "input")
   .pipeThrough(
     forEach(async () => {

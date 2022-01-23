@@ -9,7 +9,7 @@ CXXFLAGS := $(CFLAGS) -std=c++20
 LDFLAGS := $(CFLAGS) \
 -s FILESYSTEM=0 \
 -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency \
--s ALLOW_MEMORY_GROWTH=1 \
+-s ALLOW_MEMORY_GROWTH -s MAXIMUM_MEMORY=4GB \
 -s TEXTDECODER=2 
 
 OUT_JS := build/raw.js
