@@ -5,22 +5,56 @@
   }
 </style>
 <h1>lol</h1>
-<input type="file" id="f" />
-<label>
-  Scale:
-  <input type="number" min="1" max="100" step="0.1" value="20" id="scale" />
-</label>
-<label>
-  x:
-  <input type="range" min="-1" max="1" step="0.001" value="0" id="x" />
-</label>
-<label>
-  y:
-  <input type="range" min="-1" max="1" step="0.001" value="0" id="y" />
-</label>
-<label>
-  Y:
-  <input type="range" min="-2.5" max="2.5" step="0.001" value="0" id="z" />
-</label>
+<section id="inputs">
+  <input data-realtime="true" type="file" id="f" />
+  <label>
+    Scale:
+    <input
+      data-realtime="false"
+      type="number"
+      min="1"
+      max="100"
+      step="0.1"
+      value="20"
+      id="scale"
+    />
+  </label>
+  <label>
+    x:
+    <input
+      data-realtime="true"
+      type="range"
+      min="-1"
+      max="1"
+      step="0.001"
+      value="0"
+      id="x"
+    />
+  </label>
+  <label>
+    y:
+    <input
+      data-realtime="true"
+      type="range"
+      min="-1"
+      max="1"
+      step="0.001"
+      value="0"
+      id="y"
+    />
+  </label>
+  <label>
+    Y:
+    <input
+      data-realtime="true"
+      type="range"
+      min="-2.5"
+      max="2.5"
+      step="0.001"
+      value="0"
+      id="z"
+    />
+  </label>
+</section>
 <canvas id="c1"></canvas>
 <script type="module" src="./main.ts"></script>

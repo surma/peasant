@@ -1,7 +1,8 @@
-import { fromEvent, forEach, discard } from "observables-with-streams";
+import { fromEvent, forEach, discard, merge } from "observables-with-streams";
 import { decode } from "./raw-decoder.js";
 import { ShaderNode } from "./webgpu.js";
 import { Node, singleValueNode } from "./dag.js";
+import { settle } from "./observable-utilts.js";
 
 import type { Image } from "./image.js";
 
@@ -50,7 +51,13 @@ const offsetNodes = [x, y, z].map(
 const shaderNode = ShaderNode(decodedImageNode, offsetNodes as any);
 
 const node = RenderNode(shaderNode);
-fromEvent(document.body, "input")
+const realTimeInputs = [
+  ...document.querySelectorAll("input[data-realtime=true"),
+].map((el) => fromEvent(el, "input"));
+const settledInputs = [
+  ...document.querySelectorAll("input[data-realtime=false"),
+].map((el) => fromEvent(el, "input").pipeThrough(settle(1000)));
+merge(...realTimeInputs, ...settledInputs)
   .pipeThrough(
     forEach(async () => {
       try {
