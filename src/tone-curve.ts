@@ -5,7 +5,9 @@ export interface Point {
   y: number;
 }
 
-interface DraggedPoint extends Point {
+interface DragState {
+  lastX: number;
+  lastY: number;
   index: number;
 }
 
@@ -13,7 +15,7 @@ export class ToneCurve extends HTMLElement {
   private ctx: CanvasRenderingContext2D;
   private shadow: ShadowRoot;
   private ro: ResizeObserver;
-  private draggedPoint: DraggedPoint | null = null;
+  private dragState: DragState | null = null;
   public points: Array<Point> = [
     { x: 0.1, y: 0.1 },
     { x: 0.9, y: 0.9 },
@@ -141,8 +143,21 @@ export class ToneCurve extends HTMLElement {
     return 10 / Math.min(this.ctx.canvas.width, this.ctx.canvas.height);
   }
 
+  curveFunction(): (v: number) => number {
+    const points = this.sortedPoints();
+    return (x: number) => {
+      for (const [index, value] of points.entries()) {
+        if (value.x < x) continue;
+        const left = points[index - 1];
+        const right = points[index];
+        const weight = (x - left.x) / (right.x - left.x);
+        return left.y + (right.y - left.y) * weight;
+      }
+    };
+  }
+
   private onDragStart(ev: MouseEvent) {
-    const { x, y } = this.clientCoordinatesToCurveCoordinates(
+    let { x, y } = this.clientCoordinatesToCurveCoordinates(
       ev.clientX,
       ev.clientY
     );
@@ -153,20 +168,29 @@ export class ToneCurve extends HTMLElement {
     );
     // Click was close to an existing point, nothing to be done here.
     if (draggedPointIndex != null) {
-      this.draggedPoint = {
+      this.dragState = {
         index: draggedPointIndex,
-        ...this.points[draggedPointIndex],
+        lastX: x,
+        lastY: y,
       };
       return;
     }
 
     if (this.points.length >= this.maxPoints) return;
-    this.points.push({ x, y });
-    this.draggedPoint = {
-      x,
-      y,
-      index: this.points.length - 1,
+
+    // Create a new point
+
+    this.dragState = {
+      lastX: x,
+      lastY: y,
+      index: this.points.length,
     };
+    // If the alt key was pressed, create the point on the curve rather than
+    // where the mouse is.
+    if (ev.altKey) {
+      y = this.curveFunction()(x);
+    }
+    this.points.push({ x, y });
     this.repaint();
   }
 
@@ -175,16 +199,18 @@ export class ToneCurve extends HTMLElement {
       ev.clientX,
       ev.clientY
     );
-    if (this.draggedPoint === null) return;
-    const point = this.points[this.draggedPoint.index];
+    if (this.dragState === null) return;
+    const point = this.points[this.dragState.index];
     const factor = ev.altKey ? 0.1 : 1;
-    point.x = this.draggedPoint.x + factor * (x - this.draggedPoint.x);
-    point.y = this.draggedPoint.y + factor * (y - this.draggedPoint.y);
+    point.x += factor * (x - this.dragState.lastX);
+    point.y += factor * (y - this.dragState.lastY);
+    this.dragState.lastX = x;
+    this.dragState.lastY = y;
     this.repaint();
   }
 
   private onDragEnd(ev: MouseEvent) {
-    this.draggedPoint = null;
+    this.dragState = null;
   }
 
   private findPointWithinRadius(
