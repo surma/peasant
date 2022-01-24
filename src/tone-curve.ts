@@ -11,16 +11,82 @@ interface DragState {
   index: number;
 }
 
+function fac(n: number): number {
+  let v = 1;
+  for (let i = 1; i <= n; i++) v *= i;
+  return v;
+}
+
+function binomial(n: number, k: number): number {
+  return fac(n) / (fac(k) * fac(n - k));
+}
+
+function bernstein(n: number, k: number): (v: number) => number {
+  return (x) => binomial(n, k) * Math.pow(x, k) * Math.pow(1 - x, n - k);
+}
+
+function hermiteBasis(a: number, b: number): (v: number) => number {
+  if (a === 0 && b === 0) return (t) => 2 * t * t * t - 3 * t * t + 1;
+  if (a === 1 && b === 0) return (t) => t * t * t - 2 * t * t + t;
+  if (a === 0 && b === 1) return (t) => -2 * t * t * t + 3 * t * t;
+  if (a === 1 && b === 1) return (t) => t * t * t - t * t;
+  throw Error("unreachable");
+}
+
+function pointProduct(p: Point, v: number): Point {
+  return {
+    x: p.x * v,
+    y: p.y * v,
+  };
+}
+
+function pointSum(...points: Point[]): Point {
+  const sum: Point = {
+    x: 0,
+    y: 0,
+  };
+  for (const p of points) {
+    sum.x += p.x;
+    sum.y += p.y;
+  }
+  return sum;
+}
+
+function pointDifference(a: Point, b: Point): Point {
+  return {
+    x: a.x - b.x,
+    y: a.y - b.y,
+  };
+}
+
+function cubicHermite(
+  p0: Point,
+  m0: Point,
+  p1: Point,
+  m1: Point
+): (x: number) => Point {
+  return (x) => {
+    const t = (x - p0.x) / (p1.x - p0.x);
+    return pointSum(
+      pointProduct(p0, hermiteBasis(0, 0)(t)),
+      pointProduct(m0, hermiteBasis(1, 0)(t) * (p1.x - p0.x)),
+      pointProduct(p1, hermiteBasis(0, 1)(t)),
+      pointProduct(m1, hermiteBasis(1, 1)(t) * (p1.x - p0.x))
+    );
+  };
+}
+
 export class ToneCurve extends HTMLElement {
   private ctx: CanvasRenderingContext2D;
   private shadow: ShadowRoot;
   private ro: ResizeObserver;
   private dragState: DragState | null = null;
   public points: Array<Point> = [
-    { x: 0.1, y: 0.1 },
-    { x: 0.9, y: 0.9 },
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
   ];
   public maxPoints: number = 8;
+  public curvature: number = 0;
 
   constructor() {
     super();
@@ -64,13 +130,9 @@ export class ToneCurve extends HTMLElement {
     // Work on a copy
     let copy = this.points.slice();
 
-    // Sory by x coordinate
+    // Sort by x coordinate
     copy.sort((p1, p2) => p1.x - p2.x);
     copy = copy.map((point) => this.clampPoint(point));
-
-    // Insert artifical start and end points
-    copy.unshift({ x: 0, y: copy[0].y });
-    copy.push({ x: 1, y: copy[copy.length - 1].y });
 
     return copy;
   }
@@ -94,21 +156,42 @@ export class ToneCurve extends HTMLElement {
     this.ctx.restore();
   }
 
+  get sanitziedCurvature() {
+    return clamp(0, this.curvature, 1);
+  }
+
   private paintLine(thickness, color) {
     const { width, height } = this.ctx.canvas;
     this.ctx.save();
     this.ctx.strokeStyle = this.ctx.fillStyle = color;
     this.ctx.lineWidth = thickness;
     const points = this.sortedPoints();
-    const startPoint = points[0];
+    const tangents = points.map((_, i) => {
+      const prevPoint = points[clamp(0, i - 1, points.length - 1)];
+      const nextPoint = points[clamp(0, i + 1, points.length - 1)];
+      return pointProduct(
+        pointDifference(nextPoint, prevPoint),
+        ((1 - this.sanitziedCurvature) * 1) / (nextPoint.x - prevPoint.x)
+      );
+    });
     this.ctx.beginPath();
-    this.ctx.moveTo(startPoint.x * width, startPoint.y * height);
-    for (const { x, y } of points.slice(1)) {
-      this.ctx.lineTo(x * width, y * height);
+    this.ctx.moveTo(0 * width, points[0].y);
+    this.ctx.lineTo(points[0].x * width, points[0].y * height);
+    for (let [index, p0] of [...points.entries()].slice(0, -1)) {
+      const p1 = points[index + 1];
+      const m0 = tangents[index];
+      const m1 = tangents[index + 1];
+      const f = cubicHermite(p0, m0, p1, m1);
+      // We can probably do bigger steps
+      for (let x = p0.x * width; x < p1.x * width; x += 1) {
+        const p = f(x / width);
+        this.ctx.lineTo(p.x * width, p.y * height);
+      }
     }
+    this.ctx.lineTo(width, points.at(-1).y * height);
     this.ctx.stroke();
 
-    for (const { x, y } of points.slice(1, -1)) {
+    for (const { x, y } of points) {
       this.ctx.beginPath();
       this.ctx.arc(x * width, y * height, thickness * 2, 0, 2 * Math.PI);
       this.ctx.closePath();
