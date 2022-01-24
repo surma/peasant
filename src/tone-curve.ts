@@ -26,17 +26,13 @@ export class ToneCurve extends HTMLElement {
     super();
     this.shadow = this.attachShadow({ mode: "closed" });
     const canvas = this.ownerDocument.createElement("canvas");
-    canvas.addEventListener("mousedown", this.onDragStart.bind(this), {
-      passive: true,
-    });
+    canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
+    canvas.addEventListener("mousedown", this.onMouseDown.bind(this));
     this.ownerDocument.addEventListener(
       "mousemove",
-      this.onDragMove.bind(this),
-      { passive: true }
+      this.onDragMove.bind(this)
     );
-    this.ownerDocument.addEventListener("mouseup", this.onDragEnd.bind(this), {
-      passive: true,
-    });
+    this.ownerDocument.addEventListener("mouseup", this.onDragEnd.bind(this));
     this.shadow.append(canvas);
     this.ctx = canvas.getContext("2d");
 
@@ -57,15 +53,20 @@ export class ToneCurve extends HTMLElement {
     this.ro.observe(this);
   }
 
+  private clampPoint(p: Point) {
+    return {
+      x: clamp(0, p.x, 1),
+      y: clamp(0, p.y, 1),
+    };
+  }
+
   sortedPoints() {
     // Work on a copy
     let copy = this.points.slice();
 
     // Sory by x coordinate
     copy.sort((p1, p2) => p1.x - p2.x);
-
-    // Clamp values to [0;1]
-    copy = copy.map(({ x, y }) => ({ x: clamp(0, x, 1), y: clamp(0, y, 1) }));
+    copy = copy.map((point) => this.clampPoint(point));
 
     // Insert artifical start and end points
     copy.unshift({ x: 0, y: copy[0].y });
@@ -156,7 +157,18 @@ export class ToneCurve extends HTMLElement {
     };
   }
 
-  private onDragStart(ev: MouseEvent) {
+  private onMouseDown(ev: MouseEvent) {
+    if (ev.button === 0) {
+      this.onLeftClick(ev);
+      return;
+    }
+    if (ev.button === 2) {
+      this.onRightClick(ev);
+      return;
+    }
+  }
+
+  private onRightClick(ev: MouseEvent) {
     let { x, y } = this.clientCoordinatesToCurveCoordinates(
       ev.clientX,
       ev.clientY
@@ -166,7 +178,26 @@ export class ToneCurve extends HTMLElement {
       y,
       this.clickRadius
     );
-    // Click was close to an existing point, nothing to be done here.
+
+    if (draggedPointIndex == null) return;
+    if (this.points.length <= 2) return;
+
+    ev.preventDefault();
+    this.points.splice(draggedPointIndex, 1);
+  }
+
+  private onLeftClick(ev: MouseEvent) {
+    let { x, y } = this.clientCoordinatesToCurveCoordinates(
+      ev.clientX,
+      ev.clientY
+    );
+    const draggedPointIndex = this.findPointWithinRadius(
+      x,
+      y,
+      this.clickRadius
+    );
+
+    // Click was close to an existing point, start dragging.
     if (draggedPointIndex != null) {
       this.dragState = {
         index: draggedPointIndex,
@@ -176,22 +207,22 @@ export class ToneCurve extends HTMLElement {
       return;
     }
 
-    if (this.points.length >= this.maxPoints) return;
+    // ... otherwise create a new point.
 
-    // Create a new point
+    if (this.points.length >= this.maxPoints) return;
 
     this.dragState = {
       lastX: x,
       lastY: y,
       index: this.points.length,
     };
+
     // If the alt key was pressed, create the point on the curve rather than
     // where the mouse is.
     if (ev.altKey) {
       y = this.curveFunction()(x);
     }
     this.points.push({ x, y });
-    this.repaint();
   }
 
   private onDragMove(ev: MouseEvent) {
@@ -200,6 +231,7 @@ export class ToneCurve extends HTMLElement {
       ev.clientY
     );
     if (this.dragState === null) return;
+    ev.preventDefault();
     const point = this.points[this.dragState.index];
     const factor = ev.altKey ? 0.1 : 1;
     point.x += factor * (x - this.dragState.lastX);
@@ -210,6 +242,11 @@ export class ToneCurve extends HTMLElement {
   }
 
   private onDragEnd(ev: MouseEvent) {
+    this.repaint();
+    if (this.dragState === null) return;
+    this.points[this.dragState.index] = this.clampPoint(
+      this.points[this.dragState.index]
+    );
     this.dragState = null;
   }
 
