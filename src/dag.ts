@@ -38,6 +38,12 @@ export class Node<Inputs extends Array<any>, Output> {
     return inputs.every((v, idx) => this.previousInputs[idx] === v);
   }
 
+  setInputs(inputs: InputArray<Inputs>) {
+    this.previousInputs = null;
+    this.previousResult = null;
+    this.inputs = inputs;
+  }
+
   static map<Inputs extends Array<any>, Output>(
     inputs: InputArray<Inputs>,
     update: (v: Inputs) => Promise<Output>
