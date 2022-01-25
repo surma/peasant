@@ -87,3 +87,12 @@ function RenderNode(
     },
   });
 }
+
+fromEvent(document.all.ss, "input").pipeTo(
+  discard(
+    (v) =>
+      (document.querySelector("tone-curve").straightness = parseFloat(
+        v.target.value
+      ))
+  )
+);

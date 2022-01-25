@@ -11,20 +11,6 @@ interface DragState {
   index: number;
 }
 
-function fac(n: number): number {
-  let v = 1;
-  for (let i = 1; i <= n; i++) v *= i;
-  return v;
-}
-
-function binomial(n: number, k: number): number {
-  return fac(n) / (fac(k) * fac(n - k));
-}
-
-function bernstein(n: number, k: number): (v: number) => number {
-  return (x) => binomial(n, k) * Math.pow(x, k) * Math.pow(1 - x, n - k);
-}
-
 function hermiteBasis(a: number, b: number): (v: number) => number {
   if (a === 0 && b === 0) return (t) => 2 * t * t * t - 3 * t * t + 1;
   if (a === 1 && b === 0) return (t) => t * t * t - 2 * t * t + t;
@@ -81,12 +67,13 @@ export class ToneCurve extends HTMLElement {
   private shadow: ShadowRoot;
   private ro: ResizeObserver;
   private dragState: DragState | null = null;
+  private _straightness: number = 0;
   public points: Array<Point> = [
     { x: 0, y: 0 },
     { x: 1, y: 1 },
   ];
   public maxPoints: number = 8;
-  public curvature: number = 0;
+  public showGrid: boolean = true;
 
   constructor() {
     super();
@@ -112,6 +99,15 @@ export class ToneCurve extends HTMLElement {
       }
     `;
     this.shadow.append(style);
+  }
+
+  set straightness(val) {
+    this._straightness = clamp(0, val, 1);
+    this.repaint();
+  }
+
+  get straightness() {
+    return this._straightness;
   }
 
   connectedCallback() {
@@ -144,24 +140,44 @@ export class ToneCurve extends HTMLElement {
     this.repaint();
   }
 
+  get width() {
+    return this.ctx.canvas.width;
+  }
+
+  get height() {
+    return this.ctx.canvas.height;
+  }
+
   private repaint() {
     // Weird reset hack
     this.ctx.canvas.width = this.ctx.canvas.width;
-    this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+    this.ctx.clearRect(0, 0, this.width, this.height);
     this.ctx.scale(1, -1);
-    this.ctx.translate(0, -this.ctx.canvas.height);
+    this.ctx.translate(0, -this.height);
     this.ctx.save();
+    if (this.showGrid) this.paintGrid();
     this.paintLine(3, "black");
     this.paintLine(1, "white");
     this.ctx.restore();
   }
 
-  get sanitziedCurvature() {
-    return clamp(0, this.curvature, 1);
+  private paintGrid() {
+    this.ctx.save();
+    this.ctx.strokeStyle = `rgba(0, 0, 0, .2)`;
+    for (let i = 0.25; i < 1; i += 0.25) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(0 * this.width, i * this.height);
+      this.ctx.lineTo(1 * this.width, i * this.height);
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.moveTo(i * this.width, 0 * this.height);
+      this.ctx.lineTo(i * this.width, 1 * this.height);
+      this.ctx.stroke();
+    }
+    this.ctx.restore();
   }
 
   private paintLine(thickness, color) {
-    const { width, height } = this.ctx.canvas;
     this.ctx.save();
     this.ctx.strokeStyle = this.ctx.fillStyle = color;
     this.ctx.lineWidth = thickness;
@@ -171,29 +187,35 @@ export class ToneCurve extends HTMLElement {
       const nextPoint = points[clamp(0, i + 1, points.length - 1)];
       return pointProduct(
         pointDifference(nextPoint, prevPoint),
-        ((1 - this.sanitziedCurvature) * 1) / (nextPoint.x - prevPoint.x)
+        ((1 - this._straightness) * 1) / (nextPoint.x - prevPoint.x)
       );
     });
     this.ctx.beginPath();
-    this.ctx.moveTo(0 * width, points[0].y);
-    this.ctx.lineTo(points[0].x * width, points[0].y * height);
+    this.ctx.moveTo(0 * this.width, points[0].y);
+    this.ctx.lineTo(points[0].x * this.width, points[0].y * this.height);
     for (let [index, p0] of [...points.entries()].slice(0, -1)) {
       const p1 = points[index + 1];
       const m0 = tangents[index];
       const m1 = tangents[index + 1];
       const f = cubicHermite(p0, m0, p1, m1);
       // We can probably do bigger steps
-      for (let x = p0.x * width; x < p1.x * width; x += 1) {
-        const p = f(x / width);
-        this.ctx.lineTo(p.x * width, p.y * height);
+      for (let x = p0.x * this.width; x < p1.x * this.width; x += 1) {
+        const p = f(x / this.width);
+        this.ctx.lineTo(p.x * this.width, p.y * this.height);
       }
     }
-    this.ctx.lineTo(width, points.at(-1).y * height);
+    this.ctx.lineTo(this.width, points.at(-1).y * this.height);
     this.ctx.stroke();
 
     for (const { x, y } of points) {
       this.ctx.beginPath();
-      this.ctx.arc(x * width, y * height, thickness * 2, 0, 2 * Math.PI);
+      this.ctx.arc(
+        x * this.width,
+        y * this.height,
+        thickness * 2,
+        0,
+        2 * Math.PI
+      );
       this.ctx.closePath();
       this.ctx.fill();
     }
