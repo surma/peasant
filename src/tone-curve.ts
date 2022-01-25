@@ -45,7 +45,7 @@ function pointDifference(a: Point, b: Point): Point {
   };
 }
 
-function cubicHermite(
+function _cubicHermite(
   p0: Point,
   m0: Point,
   p1: Point,
@@ -60,6 +60,43 @@ function cubicHermite(
       pointProduct(m1, hermiteBasis(1, 1)(t) * (p1.x - p0.x))
     );
   };
+}
+
+export function cubicHermite(
+  points: Point[],
+  tangents: Point[]
+): (x: number) => Point {
+  const fns = points
+    .slice(0, -1)
+    .map((_, idx) =>
+      _cubicHermite(
+        points[idx],
+        tangents[idx],
+        points[idx + 1],
+        tangents[idx + 1]
+      )
+    );
+  return (x: number) => {
+    if (x < points[0].x) return points[0];
+    if (x >= points.at(-1).x) return points.at(-1);
+    let idx = points.findIndex((point) => point.x > x)! - 1;
+    return fns[idx](x);
+  };
+}
+
+function cardinalSplineTangents(
+  points: Point[],
+  straightness: number
+): Point[] {
+  straightness = clamp(0, straightness, 1);
+  return points.map((_, i) => {
+    const prevPoint = points[clamp(0, i - 1, points.length - 1)];
+    const nextPoint = points[clamp(0, i + 1, points.length - 1)];
+    return pointProduct(
+      pointDifference(nextPoint, prevPoint),
+      (1 - straightness) / (nextPoint.x - prevPoint.x)
+    );
+  });
 }
 
 export class ToneCurve extends HTMLElement {
@@ -181,32 +218,16 @@ export class ToneCurve extends HTMLElement {
     this.ctx.save();
     this.ctx.strokeStyle = this.ctx.fillStyle = color;
     this.ctx.lineWidth = thickness;
-    const points = this.sortedPoints();
-    const tangents = points.map((_, i) => {
-      const prevPoint = points[clamp(0, i - 1, points.length - 1)];
-      const nextPoint = points[clamp(0, i + 1, points.length - 1)];
-      return pointProduct(
-        pointDifference(nextPoint, prevPoint),
-        ((1 - this._straightness) * 1) / (nextPoint.x - prevPoint.x)
-      );
-    });
+    const fn = this.curveFunction();
     this.ctx.beginPath();
-    this.ctx.moveTo(0 * this.width, points[0].y);
-    this.ctx.lineTo(points[0].x * this.width, points[0].y * this.height);
-    for (let [index, p0] of [...points.entries()].slice(0, -1)) {
-      const p1 = points[index + 1];
-      const m0 = tangents[index];
-      const m1 = tangents[index + 1];
-      const f = cubicHermite(p0, m0, p1, m1);
-      // We can probably do bigger steps
-      for (let x = p0.x * this.width; x < p1.x * this.width; x += 1) {
-        const p = f(x / this.width);
-        this.ctx.lineTo(p.x * this.width, p.y * this.height);
-      }
+    this.ctx.moveTo(0, fn(0) * this.height);
+    for (let t = 0; t < 1; t += 1 / 256) {
+      const p = fn(t);
+      this.ctx.lineTo(p.x * this.width, p.y * this.height);
     }
-    this.ctx.lineTo(this.width, points.at(-1).y * this.height);
     this.ctx.stroke();
 
+    const points = this.sortedPoints();
     for (const { x, y } of points) {
       this.ctx.beginPath();
       this.ctx.arc(
@@ -249,17 +270,10 @@ export class ToneCurve extends HTMLElement {
     return 10 / Math.min(this.ctx.canvas.width, this.ctx.canvas.height);
   }
 
-  curveFunction(): (v: number) => number {
+  curveFunction(): (v: number) => Point {
     const points = this.sortedPoints();
-    return (x: number) => {
-      for (const [index, value] of points.entries()) {
-        if (value.x < x) continue;
-        const left = points[index - 1];
-        const right = points[index];
-        const weight = (x - left.x) / (right.x - left.x);
-        return left.y + (right.y - left.y) * weight;
-      }
-    };
+    const tangents = cardinalSplineTangents(points, this._straightness);
+    return cubicHermite(points, tangents);
   }
 
   private onMouseDown(ev: MouseEvent) {
