@@ -1,3 +1,8 @@
+fn operation_colorspace_conversion(color: vec4<f32>) -> vec4<f32> {
+	let target_colorspace = bitcast<u32>(operations.data[0]);
+	return convert_to_colorspace(color, target_colorspace);
+}
+
 fn run_operation(color: vec4<f32>) -> vec4<f32> {
 	switch(operations.operation) {
 		case 0u: { // OPERATION_COLORSPACE_CONVERSION

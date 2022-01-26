@@ -29,7 +29,7 @@ function encodeOperationColorspaceConversion(
   op: OperationColorspaceConversion,
   view: DataView
 ) {
-  view.setUint32(0, op.conversion);
+  view.setUint32(0, op.conversion, true);
 }
 
 function encodeOperationApplyCurve(op: OperationApplyCurve, view: DataView) {}

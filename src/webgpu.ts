@@ -16,7 +16,9 @@ import bindingsSrc from "./wgsl/bindings.wgsl?raw";
 // @ts-ignore
 import colorspacesSrc from "./wgsl/colorspaces.wgsl?raw";
 // @ts-ignore
-import shaderSrc from "./wgsl/shader.wgsl?raw";
+import processingSrc from "./wgsl/processing.wgsl?raw";
+// @ts-ignore
+import renderSrc from "./wgsl/render.wgsl?raw";
 
 function totalAbort(msg) {
   document.body.innerHTML = `<pre class="error">${msg}</pre>`;
@@ -45,7 +47,7 @@ await (async () => {
 })();
 
 export function ShaderNode(img: Node<any, Image>) {
-  let bufferA = device.createBuffer({
+  let bufferIn = device.createBuffer({
     size: MAX_NUM_PIXELS * 4 * Float32Array.BYTES_PER_ELEMENT,
     usage:
       GPUBufferUsage.STORAGE |
@@ -53,7 +55,7 @@ export function ShaderNode(img: Node<any, Image>) {
       GPUBufferUsage.COPY_SRC,
   });
 
-  let bufferB = device.createBuffer({
+  let bufferOut = device.createBuffer({
     size: MAX_NUM_PIXELS * 4 * Float32Array.BYTES_PER_ELEMENT,
     usage:
       GPUBufferUsage.STORAGE |
@@ -98,16 +100,30 @@ export function ShaderNode(img: Node<any, Image>) {
     ],
   });
 
-  const shaderModule = device.createShaderModule({
-    code: [bindingsSrc, colorspacesSrc, shaderSrc].join("\n"),
+  const processingModule = device.createShaderModule({
+    code: [bindingsSrc, colorspacesSrc, processingSrc].join("\n"),
   });
 
-  const computePipeline = device.createComputePipeline({
+  const renderModule = device.createShaderModule({
+    code: [colorspacesSrc, renderSrc].join("\n"),
+  });
+
+  const processingPipeline = device.createComputePipeline({
     layout: device.createPipelineLayout({
       bindGroupLayouts: [bindGroupLayout],
     }),
     compute: {
-      module: shaderModule,
+      module: processingModule,
+      entryPoint: "main",
+    },
+  });
+
+  const renderPipeline = device.createComputePipeline({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout],
+    }),
+    compute: {
+      module: renderModule,
       entryPoint: "main",
     },
   });
@@ -117,7 +133,7 @@ export function ShaderNode(img: Node<any, Image>) {
   const imgUploaderNode = new Node<[Image], Image>({
     inputs: [img],
     async update([img]) {
-      device.queue.writeBuffer(bufferA, 0, img.data);
+      device.queue.writeBuffer(bufferIn, 0, img.data);
       return img;
     },
   });
@@ -125,7 +141,7 @@ export function ShaderNode(img: Node<any, Image>) {
   function createOperationsBuffer(
     width: number,
     height: number,
-    op: Operation
+    op?: Operation
   ): ArrayBuffer {
     const buffer = new ArrayBuffer(
       3 * Uint32Array.BYTES_PER_ELEMENT + 1024 * Float32Array.BYTES_PER_ELEMENT
@@ -134,9 +150,37 @@ export function ShaderNode(img: Node<any, Image>) {
     const view = new DataView(buffer);
     view.setUint32(0, width, true);
     view.setUint32(4, height, true);
-    view.setUint32(8, op.type, true);
-    encodeOperation(op, new DataView(buffer, startOfData));
+    if (op) {
+      view.setUint32(8, op.type, false);
+      encodeOperation(op, new DataView(buffer, startOfData));
+    }
     return buffer;
+  }
+
+  function createBindGroup() {
+    return device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: bufferIn,
+          },
+        },
+        {
+          binding: 1,
+          resource: {
+            buffer: bufferOut,
+          },
+        },
+        {
+          binding: 2,
+          resource: {
+            buffer: operationsBuffer,
+          },
+        },
+      ],
+    });
   }
 
   return new Node<[Image], Image<Uint8ClampedArray>>({
@@ -144,8 +188,7 @@ export function ShaderNode(img: Node<any, Image>) {
     async update([img]) {
       const numOutputPixels = img.width * img.height;
       const numOutputBytes =
-        numOutputPixels * 4 * Float32Array.BYTES_PER_ELEMENT;
-
+        numOutputPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
       const operations: Operation[] = [
         {
           type: OperationType.OPERATION_COLORSPACE_CONVERSION,
@@ -155,47 +198,19 @@ export function ShaderNode(img: Node<any, Image>) {
           type: OperationType.OPERATION_COLORSPACE_CONVERSION,
           conversion: 256,
         },
-        {
-          type: OperationType.OPERATION_COLORSPACE_CONVERSION,
-          conversion: 0,
-        },
       ];
 
-      for (const [index, op] of operations.entries()) {
+      for (const op of operations) {
         device.queue.writeBuffer(
           operationsBuffer,
           0,
           createOperationsBuffer(img.width, img.height, op)
         );
 
-        const bindGroup = device.createBindGroup({
-          layout: bindGroupLayout,
-          entries: [
-            {
-              binding: 0,
-              resource: {
-                buffer: isEven(index) ? bufferA : bufferB,
-              },
-            },
-            {
-              binding: 1,
-              resource: {
-                buffer: isEven(index) ? bufferB : bufferA,
-              },
-            },
-            {
-              binding: 2,
-              resource: {
-                buffer: operationsBuffer,
-              },
-            },
-          ],
-        });
-
         const commandEncoder = device.createCommandEncoder();
         const passEncoder = commandEncoder.beginComputePass();
-        passEncoder.setPipeline(computePipeline);
-        passEncoder.setBindGroup(0, bindGroup);
+        passEncoder.setPipeline(processingPipeline);
+        passEncoder.setBindGroup(0, createBindGroup());
         passEncoder.dispatch(
           Math.ceil(img.width / 16),
           Math.ceil(img.height / 16)
@@ -203,11 +218,28 @@ export function ShaderNode(img: Node<any, Image>) {
         passEncoder.endPass();
         const commands = commandEncoder.finish();
         device.queue.submit([commands]);
+        [bufferIn, bufferOut] = [bufferOut, bufferIn];
       }
+      // If the loop ended, undo the last swap.
+      [bufferIn, bufferOut] = [bufferOut, bufferIn];
 
+      [bufferIn, bufferOut] = [bufferOut, bufferIn];
+      device.queue.writeBuffer(
+        operationsBuffer,
+        0,
+        createOperationsBuffer(img.width, img.height, null)
+      );
       const commandEncoder = device.createCommandEncoder();
+      const passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(renderPipeline);
+      passEncoder.setBindGroup(0, createBindGroup());
+      passEncoder.dispatch(
+        Math.ceil(img.width / 16),
+        Math.ceil(img.height / 16)
+      );
+      passEncoder.endPass();
       commandEncoder.copyBufferToBuffer(
-        isEven(operations.length) ? bufferB : bufferA,
+        bufferOut,
         0,
         gpuReadBuffer,
         0,
@@ -218,13 +250,12 @@ export function ShaderNode(img: Node<any, Image>) {
 
       await gpuReadBuffer.mapAsync(GPUMapMode.READ);
       const copyArrayBuffer = gpuReadBuffer.getMappedRange(0, numOutputBytes);
-      const data = new Float32Array(copyArrayBuffer).slice();
-      // console.log({data, numOutputBy});
+      const data = new Uint8ClampedArray(copyArrayBuffer).slice();
       gpuReadBuffer.unmap();
 
       return {
         ...img,
-        data: new Uint8ClampedArray(data.map((v) => v * 255)),
+        data,
       };
     },
   });

@@ -139,8 +139,8 @@ fn XYZ_to_sRGB(color: vec4<f32>) -> vec4<f32> {
 fn sRGB_to_XYZ(color: vec4<f32>) -> vec4<f32> {
 	let linear_srgb = vec3(
 		sRGB_degamma(color.r),
-		sRGB_degamma(color.r),
-		sRGB_degamma(color.r),
+		sRGB_degamma(color.g),
+		sRGB_degamma(color.b),
 	);
 	return vec4(linear_sRGB_to_XYZ(linear_srgb), color.a);
 }
@@ -164,9 +164,4 @@ fn convert_to_colorspace(color: vec4<f32>, target_colorspace: u32) -> vec4<f32> 
 			return color;
 		} 
 	}
-}
-
-fn operation_colorspace_conversion(color: vec4<f32>) -> vec4<f32> {
-	let target_colorspace = bitcast<u32>(operations.data[0]);
-	return convert_to_colorspace(color, target_colorspace);
 }
