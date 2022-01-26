@@ -3,15 +3,23 @@ export const enum OperationType {
   OPERATION_APPLY_CURVE,
 }
 
+export const enum ColorSpaceConversion {
+  XYZ_to_sRGB = 0,
+  XYZ_to_xyY,
+  sRGB_to_XYZ = 256,
+  xyY_to_XYZ,
+}
+
 export interface OperationColorspaceConversion {
   type: OperationType.OPERATION_COLORSPACE_CONVERSION;
-  conversion: number;
+  conversion: ColorSpaceConversion;
 }
 
 export interface OperationApplyCurve {
   type: OperationType.OPERATION_APPLY_CURVE;
-  conversion: number;
-  curve: number[];
+  conversion: ColorSpaceConversion;
+  channel: number;
+  curve: Float32Array;
 }
 
 export type Operation = OperationApplyCurve | OperationColorspaceConversion;
@@ -32,4 +40,8 @@ function encodeOperationColorspaceConversion(
   view.setUint32(0, op.conversion, true);
 }
 
-function encodeOperationApplyCurve(op: OperationApplyCurve, view: DataView) {}
+function encodeOperationApplyCurve(op: OperationApplyCurve, view: DataView) {
+  view.setUint32(0, op.conversion, true);
+  view.setUint32(4, op.channel, true);
+  new Float32Array(view.buffer, view.byteOffset + 8).set(op.curve);
+}

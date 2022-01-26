@@ -25,7 +25,7 @@ fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
 	}
 	let index = global_id.y * meta.width + global_id.x;
 	var color = input.pixel[index];
-	color = XYZ_to_sRGB(color);
+	color = vec4(XYZ_to_sRGB(color.rgb), color.a);
 	// Manual conversion from vec4<[0. to 1.]> to vec4<[0 to 255]>
 	color = clamp(color, vec4(0.), vec4(1.)) * 255.;
 	output.pixel[index] = (u32(color.r) << 0u) | (u32(color.g) << 8u) | (u32(color.b) << 16u) | (u32(color.a) << 24u);

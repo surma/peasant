@@ -1,20 +1,28 @@
 import { fromEvent, forEach, discard, merge } from "observables-with-streams";
 import { decode } from "./raw-decoder.js";
-import { ShaderNode } from "./webgpu.js";
+import { ProcessingNode } from "./webgpu.js";
 import { Node } from "./dag.js";
-import { settle } from "./observable-utilts.js";
-import "./tone-curve.js";
+import { settle } from "./observable-utils.js";
+import { ToneCurve } from "./tone-curve.js";
+customElements.define("tone-curve", ToneCurve);
 
 import type { Image } from "./image.js";
 import { clamp } from "./utils.js";
+import {
+  ColorSpaceConversion,
+  Operation,
+  OperationType,
+} from "./operations.js";
 
-const { f, c1, x, y, z, scale } = document.all as any as {
+const { f, c1, x, y, z, scale, ss, tc } = document.all as any as {
   f: HTMLInputElement;
   c1: HTMLCanvasElement;
   x: HTMLInputElement;
   y: HTMLInputElement;
   z: HTMLInputElement;
   scale: HTMLInputElement;
+  ss: HTMLInputElement;
+  tc: ToneCurve;
 };
 const ctx = c1.getContext("2d");
 ctx.fillStyle = "red";
@@ -42,16 +50,40 @@ const decodedImageNode = new Node<[ArrayBuffer, number], Image>({
   update: async ([inputBuffer, scale]) => decode(inputBuffer, scale),
 });
 
-const shaderNode = ShaderNode(decodedImageNode);
+let curve: Float32Array = new Float32Array(512);
+curve.forEach((_, i, arr) => (arr[i] = i / arr.length));
+
+fromEvent(tc, "input").pipeTo(
+  discard((v) => {
+    curve = generateCurveMap(tc);
+  })
+);
+
+const operationsNode = new Node<[], Float32Array>({
+  async update() {
+    return curve;
+  },
+}).map<Operation[]>(async (curve) => {
+  return [
+    {
+      type: OperationType.OPERATION_APPLY_CURVE,
+      conversion: ColorSpaceConversion.XYZ_to_xyY,
+      channel: 2,
+      curve,
+    },
+  ];
+});
+
+const shaderNode = ProcessingNode(decodedImageNode, operationsNode);
 const node = RenderNode(shaderNode);
 
 // A bit of plumbing to pull a new value out of the DAG whenever any of the
 // input values chage.
 const realTimeInputs = [
-  ...document.querySelectorAll("input[data-realtime=true]"),
+  ...document.querySelectorAll("[data-realtime=true]"),
 ].map((el) => fromEvent(el, "input"));
 const settledInputs = [
-  ...document.querySelectorAll("input[data-realtime=false]"),
+  ...document.querySelectorAll("[data-realtime=false]"),
 ].map((el) => fromEvent(el, "input").pipeThrough(settle(1000)));
 merge(...realTimeInputs, ...settledInputs)
   .pipeThrough(
@@ -79,11 +111,25 @@ function RenderNode(
   });
 }
 
-fromEvent(document.all.ss, "input").pipeTo(
-  discard(
-    (v) =>
-      (document.querySelector("tone-curve").straightness = parseFloat(
-        v.target.value
-      ))
-  )
+fromEvent(ss, "input").pipeTo(
+  discard((v) => (tc.straightness = parseFloat(ss.value)))
 );
+
+function generateCurveMap(tc: ToneCurve): Float32Array {
+  const result = new Float32Array(512);
+  const f = tc.curveFunction();
+  result[0] = f(0).y;
+
+  let idx = 1;
+  for (let t = 0; t < 1; t += 1 / (2 * result.length)) {
+    const p = f(t);
+    if (p.x >= idx / (result.length - 1)) {
+      result[idx] = p.y;
+      idx++;
+    }
+  }
+
+  result[result.length - 1] = f(1).y;
+
+  return result;
+}

@@ -1,4 +1,4 @@
-import { clamp, entries, pointDistance } from "./utils.js";
+import { clamp, pointDistance } from "./utils.js";
 
 export interface Point {
   x: number;
@@ -196,6 +196,7 @@ export class ToneCurve extends HTMLElement {
     this.paintLine(3, "black");
     this.paintLine(1, "white");
     this.ctx.restore();
+    this.dispatchEvent(new InputEvent("input", {}));
   }
 
   private paintGrid() {
@@ -391,5 +392,3 @@ export class ToneCurve extends HTMLElement {
     this.ro = null;
   }
 }
-
-customElements.define("tone-curve", ToneCurve);

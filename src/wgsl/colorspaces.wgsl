@@ -126,23 +126,22 @@ fn Lab_to_XYZ(Lab: vec3<f32>) -> vec3<f32> {
 	return xyz * D50;
 }
 
-fn XYZ_to_sRGB(color: vec4<f32>) -> vec4<f32> {
-	let linear_srgb = XYZ_to_linear_sRGB(color.rgb);
-	return vec4(
+fn XYZ_to_sRGB(color: vec3<f32>) -> vec3<f32> {
+	let linear_srgb = XYZ_to_linear_sRGB(color);
+	return vec3(
 		sRGB_gamma(linear_srgb.r),
 		sRGB_gamma(linear_srgb.g),
-		sRGB_gamma(linear_srgb.b),
-		color.a
+		sRGB_gamma(linear_srgb.b)
 	);
 }
 
-fn sRGB_to_XYZ(color: vec4<f32>) -> vec4<f32> {
+fn sRGB_to_XYZ(color: vec3<f32>) -> vec3<f32> {
 	let linear_srgb = vec3(
 		sRGB_degamma(color.r),
 		sRGB_degamma(color.g),
 		sRGB_degamma(color.b),
 	);
-	return vec4(linear_sRGB_to_XYZ(linear_srgb), color.a);
+	return linear_sRGB_to_XYZ(linear_srgb);
 }
 
 /*
@@ -153,15 +152,23 @@ fn sRGB_to_XYZ(color: vec4<f32>) -> vec4<f32> {
 */
 
 fn convert_to_colorspace(color: vec4<f32>, target_colorspace: u32) -> vec4<f32> {
+	var rgb_color = color.rgb;
 	switch(target_colorspace) {
-		case 0u: { // XYZ_TO_SRGB 
-			return XYZ_to_sRGB(color);
+		case 0u: { // XYZ_to_sRGB 
+			rgb_color = XYZ_to_sRGB(rgb_color);
 		}
-		case 256u: { // SRGB_TO_XYZ = XYZ_TO_SRGB + 256 
-			return sRGB_to_XYZ(color);
+		case 1u: { // XYZ_to_xyY
+			rgb_color = XYZ_to_xyY(rgb_color);
+		}
+		case 256u: { // sRGB_to_XYZ = XYZ_to_sRGB + 256 
+			rgb_color = sRGB_to_XYZ(rgb_color);
+		}
+		case 257u: { // xyY_to_XYZ
+			rgb_color = xyY_to_XYZ(rgb_color);
 		}
 		default: {
-			return color;
+			rgb_color = rgb_color;
 		} 
 	}
+	return vec4(rgb_color, color.a);
 }

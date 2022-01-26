@@ -6,15 +6,14 @@
   tone-curve {
     display: block;
     position: relative;
-    min-height: 400px;
-    resize: both;
-    overflow: hidden;
-    outline: 1px solid blue;
+  }
+  main {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 </style>
 <h1>lol</h1>
 <input type="range" min="0" max="1" step="0.001" value="0" id="ss" />
-<!-- <tone-curve></tone-curve> -->
 <section id="inputs">
   <input data-realtime="true" type="file" id="f" />
   <label>
@@ -30,5 +29,8 @@
     />
   </label>
 </section>
-<canvas id="c1"></canvas>
+<main>
+  <canvas id="c1"></canvas>
+  <tone-curve data-realtime="true" id="tc"></tone-curve>
+</main>
 <script type="module" src="./main.ts"></script>

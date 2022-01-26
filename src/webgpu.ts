@@ -1,20 +1,18 @@
 /// <reference types="@webgpu/types" />
 
-import { Node, NodeParams, singleValueNode } from "./dag.js";
+import { Node } from "./dag.js";
 
 import type { Image } from "./image.js";
-import { encodeOperation, Operation, OperationType } from "./operations.js";
-import { entries, isEven } from "./utils.js";
+import { encodeOperation, Operation } from "./operations.js";
 
-const MAX_WIDTH = 2 ** 13;
-const MAX_HEIGHT = 2 ** 13;
-const MAX_NUM_PIXELS = MAX_WIDTH * MAX_HEIGHT;
-const MAX_BUFFER_SIZE = MAX_NUM_PIXELS * 4 * Float32Array.BYTES_PER_ELEMENT;
+const MAX_BUFFER_SIZE = 8192 ** 2 * 4 * Float32Array.BYTES_PER_ELEMENT;
 
 // @ts-ignore
 import bindingsSrc from "./wgsl/bindings.wgsl?raw";
 // @ts-ignore
 import colorspacesSrc from "./wgsl/colorspaces.wgsl?raw";
+// @ts-ignore
+import curvesSrc from "./wgsl/curves.wgsl?raw";
 // @ts-ignore
 import processingSrc from "./wgsl/processing.wgsl?raw";
 // @ts-ignore
@@ -53,7 +51,10 @@ interface ImageUploaderOutput {
   img: Image;
 }
 
-export function ShaderNode(img: Node<any, Image>) {
+export function ProcessingNode(
+  img: Node<any, Image>,
+  operationsNode: Node<any, Operation[]>
+) {
   let bufferIn: GPUBuffer;
   let bufferOut: GPUBuffer;
   let gpuReadBuffer: GPUBuffer;
@@ -85,7 +86,7 @@ export function ShaderNode(img: Node<any, Image>) {
   });
 
   const processingModule = device.createShaderModule({
-    code: [bindingsSrc, colorspacesSrc, processingSrc].join("\n"),
+    code: [bindingsSrc, colorspacesSrc, curvesSrc, processingSrc].join("\n"),
   });
 
   const renderModule = device.createShaderModule({
@@ -174,11 +175,11 @@ export function ShaderNode(img: Node<any, Image>) {
 
       if (gpuReadBuffer) bufferOut.destroy();
       gpuReadBuffer = device.createBuffer({
-        size: numOutputBytes,
+        // size: numOutputBytes,
+        size: numInputBytes,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
       });
 
-      device.queue.writeBuffer(bufferIn, 0, img.data);
       return {
         numPixels,
         numInputBytes,
@@ -194,31 +195,36 @@ export function ShaderNode(img: Node<any, Image>) {
     op?: Operation
   ): ArrayBuffer {
     const buffer = new ArrayBuffer(
-      3 * Uint32Array.BYTES_PER_ELEMENT + 1024 * Float32Array.BYTES_PER_ELEMENT
+      4 * Uint32Array.BYTES_PER_ELEMENT + 1024 * Float32Array.BYTES_PER_ELEMENT
     );
     const startOfData = 4 * Uint32Array.BYTES_PER_ELEMENT;
     const view = new DataView(buffer);
     view.setUint32(0, width, true);
     view.setUint32(4, height, true);
     if (op) {
-      view.setUint32(8, op.type, false);
+      view.setUint32(8, op.type, true);
       encodeOperation(op, new DataView(buffer, startOfData));
     }
     return buffer;
   }
 
-  const operationsNode = singleValueNode<Operation[]>([
-    {
-      type: OperationType.OPERATION_COLORSPACE_CONVERSION,
-      conversion: 0,
-    },
-    {
-      type: OperationType.OPERATION_COLORSPACE_CONVERSION,
-      conversion: 256,
-    },
-  ]);
+  async function readOutBuffer(numBytes: number): Promise<ArrayBuffer> {
+    const commandEncoder = device.createCommandEncoder();
+    commandEncoder.copyBufferToBuffer(bufferOut, 0, gpuReadBuffer, 0, numBytes);
+    const commands = commandEncoder.finish();
+    device.queue.submit([commands]);
 
-  async function readOutBufferAsImageData(width, height): Promise<ImageData> {
+    await gpuReadBuffer.mapAsync(GPUMapMode.READ, 0, numBytes);
+    const copyArrayBuffer = gpuReadBuffer.getMappedRange(0, numBytes);
+    const data = copyArrayBuffer.slice(0);
+    gpuReadBuffer.unmap();
+    return data;
+  }
+
+  async function readOutBufferAsImageData(
+    width: number,
+    height: number
+  ): Promise<ImageData> {
     const numOutputBytes =
       width * height * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
 
@@ -234,28 +240,20 @@ export function ShaderNode(img: Node<any, Image>) {
     passEncoder.setBindGroup(0, createBindGroup());
     passEncoder.dispatch(Math.ceil(width / 16), Math.ceil(height / 16));
     passEncoder.endPass();
-    commandEncoder.copyBufferToBuffer(
-      bufferOut,
-      0,
-      gpuReadBuffer,
-      0,
-      numOutputBytes
-    );
     const commands = commandEncoder.finish();
     device.queue.submit([commands]);
 
-    await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-    const copyArrayBuffer = gpuReadBuffer.getMappedRange(0, numOutputBytes);
-    const data = new Uint8ClampedArray(copyArrayBuffer).slice();
-    gpuReadBuffer.unmap();
-
+    const buffer = await readOutBuffer(numOutputBytes);
+    const data = new Uint8ClampedArray(buffer).slice();
     return new ImageData(data, width, height);
   }
 
   return new Node<[ImageUploaderOutput, Operation[]], Image<Uint8ClampedArray>>(
     {
       inputs: [imgUploaderNode, operationsNode],
-      async update([{ numOutputBytes, img }, operations]) {
+      async update([{ img }, operations]) {
+        device.queue.writeBuffer(bufferIn, 0, img.data);
+
         for (const op of operations) {
           device.queue.writeBuffer(
             operationsBuffer,
@@ -276,7 +274,8 @@ export function ShaderNode(img: Node<any, Image>) {
           device.queue.submit([commands]);
           [bufferIn, bufferOut] = [bufferOut, bufferIn];
         }
-        // If the loop ended, undo the last swap.
+        // If the loop ended, undo the last swap so that there is
+        // a result in `bufferOut`.
         [bufferIn, bufferOut] = [bufferOut, bufferIn];
 
         return {

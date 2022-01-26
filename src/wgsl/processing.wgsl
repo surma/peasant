@@ -9,7 +9,7 @@ fn run_operation(color: vec4<f32>) -> vec4<f32> {
 			return operation_colorspace_conversion(color);
 		}
 		case 1u: { // OPERATION_APPLY_CURVE
-			return color;
+			return operation_apply_curve(color);
 		}
 		default: {
 			return color;
