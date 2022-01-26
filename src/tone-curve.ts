@@ -220,7 +220,7 @@ export class ToneCurve extends HTMLElement {
     this.ctx.lineWidth = thickness;
     const fn = this.curveFunction();
     this.ctx.beginPath();
-    this.ctx.moveTo(0, fn(0) * this.height);
+    this.ctx.moveTo(0, fn(0).y * this.height);
     for (let t = 0; t < 1; t += 1 / 256) {
       const p = fn(t);
       this.ctx.lineTo(p.x * this.width, p.y * this.height);
@@ -339,7 +339,7 @@ export class ToneCurve extends HTMLElement {
     // If the alt key was pressed, create the point on the curve rather than
     // where the mouse is.
     if (ev.altKey) {
-      y = this.curveFunction()(x);
+      y = this.curveFunction()(x).y;
     }
     this.points.push({ x, y });
   }

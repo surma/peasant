@@ -42,16 +42,7 @@ const decodedImageNode = new Node<[ArrayBuffer, number], Image>({
   update: async ([inputBuffer, scale]) => decode(inputBuffer, scale),
 });
 
-const offsetNodes = [x, y, z].map(
-  (el) =>
-    new Node<[], number>({
-      async update() {
-        return parseFloat(el.value);
-      },
-    })
-);
-
-const shaderNode = ShaderNode(decodedImageNode, offsetNodes as any);
+const shaderNode = ShaderNode(decodedImageNode);
 const node = RenderNode(shaderNode);
 
 // A bit of plumbing to pull a new value out of the DAG whenever any of the

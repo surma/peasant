@@ -2,12 +2,26 @@
 // which can be found here: 
 // https://github.com/w3c/csswg-drafts/blob/main/css-color-4
 
+// Assuming XYZ with D65
+let XYZ_to_linear_sRGB_matrix = mat3x3<f32>(
+	 3.2409699419045226, -0.96924363628087960,  0.05563007969699366,
+	-1.5373831775700940,  1.87596750150772020, -0.20397695888897652,
+	-0.4986107602930034,  0.04155505740717559,  1.05697151424287860
+);
+
+// Assuming XYZ with D65
+let linear_sRGB_to_XYZ_matrix = mat3x3<f32>(
+	0.41239079926595934, 0.21263900587151030, 0.019330818715591815,
+	0.35758433938387807, 0.71516867876775610, 0.119194779794625960,
+	0.18048078840183426, 0.07219231536073371, 0.950532152249660500,
+);
+
 fn XYZ_to_linear_sRGB(v: vec3<f32>) -> vec3<f32> {
-	return mat3x3<f32>(
-		3.2409699419045226, -0.96924363628087960,  0.05563007969699366,
-		-1.5373831775700940,  1.87596750150772020, -0.20397695888897652,
-		-0.4986107602930034,  0.04155505740717559,  1.05697151424287860
-	) * v;
+	return XYZ_to_linear_sRGB_matrix * v;
+}
+
+fn linear_sRGB_to_XYZ(v: vec3<f32>) -> vec3<f32> {
+	return linear_sRGB_to_XYZ_matrix * v;
 }
 
 fn xyY_to_XYZ(v: vec3<f32>) -> vec3<f32> {
@@ -48,6 +62,23 @@ fn sRGB_gamma(val: f32) -> f32 {
 		}
 
 		return 12.92 * val;
+}
+
+fn sRGB_degamma(val: f32) -> f32 {
+	// convert an array of sRGB values
+	// where in-gamut values are in the range [0 - 1]
+	// to linear light (un-companded) form.
+	// https://en.wikipedia.org/wiki/SRGB
+	// Extended transfer function:
+	// for negative values,  linear portion is extended on reflection of axis,
+	// then reflected power function is used.
+	let abs = abs(val);
+
+	if (abs < 0.04045) {
+		return val / 12.92;
+	}
+
+	return sign(val) * (pow((abs + 0.055) / 1.055, 2.4));
 }
 
 fn XYZ_to_Lab(value: vec3<f32>) -> vec3<f32> {
@@ -103,4 +134,39 @@ fn XYZ_to_sRGB(color: vec4<f32>) -> vec4<f32> {
 		sRGB_gamma(linear_srgb.b),
 		color.a
 	);
+}
+
+fn sRGB_to_XYZ(color: vec4<f32>) -> vec4<f32> {
+	let linear_srgb = vec3(
+		sRGB_degamma(color.r),
+		sRGB_degamma(color.r),
+		sRGB_degamma(color.r),
+	);
+	return vec4(linear_sRGB_to_XYZ(linear_srgb), color.a);
+}
+
+/*
+	This encodes the possible colorspace conversions.
+	[0; 256] is allocated for conversions from XYZ to other color spaces.
+	<Any conversion index> + 256 ought to be the inverse conversion, 
+	i.e. from the other color space to XYZ.
+*/
+
+fn convert_to_colorspace(color: vec4<f32>, target_colorspace: u32) -> vec4<f32> {
+	switch(target_colorspace) {
+		case 0u: { // XYZ_TO_SRGB 
+			return XYZ_to_sRGB(color);
+		}
+		case 256u: { // SRGB_TO_XYZ = XYZ_TO_SRGB + 256 
+			return sRGB_to_XYZ(color);
+		}
+		default: {
+			return color;
+		} 
+	}
+}
+
+fn operation_colorspace_conversion(color: vec4<f32>) -> vec4<f32> {
+	let target_colorspace = bitcast<u32>(operations.data[0]);
+	return convert_to_colorspace(color, target_colorspace);
 }
