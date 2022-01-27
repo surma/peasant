@@ -52,7 +52,7 @@ interface ImageUploaderOutput {
 }
 
 export function ProcessingNode(
-  img: Node<any, Image>,
+  img: Node<any, Image | null>,
   operationsNode: Node<any, Operation[]>
 ) {
   let bufferIn: GPUBuffer;
@@ -147,9 +147,10 @@ export function ProcessingNode(
 
   // A separate node so that image uploading doesn’t happen on every update,
   // but only when the image actually changes.
-  const imgUploaderNode = new Node<[Image], ImageUploaderOutput>({
+  const imgUploaderNode = new Node<[Image | null], ImageUploaderOutput | null>({
     inputs: [img],
     async update([img]) {
+      if (!img) return null;
       const numPixels = img.width * img.height;
       const numInputBytes = numPixels * 4 * Float32Array.BYTES_PER_ELEMENT;
       const numOutputBytes =
@@ -248,41 +249,44 @@ export function ProcessingNode(
     return new ImageData(data, width, height);
   }
 
-  return new Node<[ImageUploaderOutput, Operation[]], Image<Uint8ClampedArray>>(
-    {
-      inputs: [imgUploaderNode, operationsNode],
-      async update([{ img }, operations]) {
-        device.queue.writeBuffer(bufferIn, 0, img.data);
+  return new Node<
+    [ImageUploaderOutput | null, Operation[]],
+    Image<Uint8ClampedArray> | null
+  >({
+    inputs: [imgUploaderNode, operationsNode],
+    async update([iuo, operations]) {
+      if (!iuo) return null;
+      const { img } = iuo;
+      device.queue.writeBuffer(bufferIn, 0, img.data);
 
-        for (const op of operations) {
-          device.queue.writeBuffer(
-            operationsBuffer,
-            0,
-            createOperationsBuffer(img.width, img.height, op)
-          );
+      for (const op of operations) {
+        device.queue.writeBuffer(
+          operationsBuffer,
+          0,
+          createOperationsBuffer(img.width, img.height, op)
+        );
 
-          const commandEncoder = device.createCommandEncoder();
-          const passEncoder = commandEncoder.beginComputePass();
-          passEncoder.setPipeline(processingPipeline);
-          passEncoder.setBindGroup(0, createBindGroup());
-          passEncoder.dispatch(
-            Math.ceil(img.width / 16),
-            Math.ceil(img.height / 16)
-          );
-          passEncoder.endPass();
-          const commands = commandEncoder.finish();
-          device.queue.submit([commands]);
-          [bufferIn, bufferOut] = [bufferOut, bufferIn];
-        }
-        // If the loop ended, undo the last swap so that there is
-        // a result in `bufferOut`.
+        const commandEncoder = device.createCommandEncoder();
+        const passEncoder = commandEncoder.beginComputePass();
+        passEncoder.setPipeline(processingPipeline);
+        passEncoder.setBindGroup(0, createBindGroup());
+        passEncoder.dispatch(
+          Math.ceil(img.width / 16),
+          Math.ceil(img.height / 16)
+        );
+        passEncoder.endPass();
+        const commands = commandEncoder.finish();
+        device.queue.submit([commands]);
         [bufferIn, bufferOut] = [bufferOut, bufferIn];
+      }
+      // If the loop ended, undo the last swap so that there is
+      // a result in `bufferOut`.
+      [bufferIn, bufferOut] = [bufferOut, bufferIn];
 
-        return {
-          ...img,
-          data: (await readOutBufferAsImageData(img.width, img.height)).data,
-        };
-      },
-    }
-  );
+      return {
+        ...img,
+        data: (await readOutBufferAsImageData(img.width, img.height)).data,
+      };
+    },
+  });
 }

@@ -34,7 +34,7 @@ const fileNode = new Node({
   async update() {
     return f.files?.[0];
   },
-}).map((file) => {
+}).map<ArrayBuffer | null>((file) => {
   if (!file) return;
   return new Response(file).arrayBuffer();
 });
@@ -45,9 +45,15 @@ const scaleNode = new Node<[], number>({
   },
 });
 
-const decodedImageNode = new Node<[ArrayBuffer, number], Image>({
+const decodedImageNode = new Node<
+  [ArrayBuffer | undefined, number],
+  Image | null
+>({
   inputs: [fileNode, scaleNode],
-  update: async ([inputBuffer, scale]) => decode(inputBuffer, scale),
+  update: async ([inputBuffer, scale]) => {
+    if (!inputBuffer) return null;
+    return decode(inputBuffer, scale);
+  },
 });
 
 let curve: Float32Array = new Float32Array(512);
@@ -98,11 +104,12 @@ merge(...realTimeInputs, ...settledInputs)
   .pipeTo(discard());
 
 function RenderNode(
-  input: Node<any, Image<Uint8ClampedArray>>
+  input: Node<any, Image<Uint8ClampedArray> | null>
 ): Node<any, unknown> {
   return new Node({
     inputs: [input],
     async update([img]) {
+      if (!img) return null;
       const imgData = new ImageData(img.data, img.width, img.height);
       c1.width = imgData.width;
       c1.height = imgData.height;
