@@ -128,6 +128,10 @@ export class ToneCurve extends HTMLElement {
 
     const style = this.ownerDocument.createElement("style");
     style.innerHTML = `
+      :host {
+        display: block;
+        position: relative;
+      }
       canvas {
         position: absolute;
         top: 0;

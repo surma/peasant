@@ -1,0 +1,13 @@
+.editor {
+  display: grid;
+  grid-template-columns: 1fr max-content;
+  grid-template-areas: "view controls";
+}
+
+.view {
+  grid-area: view;
+}
+
+.controls {
+  grid-area: controls;
+}
