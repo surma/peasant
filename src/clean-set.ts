@@ -3,7 +3,8 @@ export function cleanSet<T>(
   path: Array<number | string>,
   value: any
 ): T;
-export function cleanSet(obj, path, value) {
+export function cleanSet(obj, ...[path, value, ...rest]) {
+  if(!path) return obj;
   if (Array.isArray(obj)) {
     const newObj = [...obj];
     newObj.splice(
@@ -11,14 +12,16 @@ export function cleanSet(obj, path, value) {
       1,
       path.length === 1 ? value : cleanSet(obj[path[0]], path.slice(1), value)
     );
-    return newObj;
+    // @ts-ignore
+    return cleanSet(newObj, ...rest);
   } else {
-    return {
+    return cleanSet({
       ...obj,
       [path[0]]:
         path.length === 1
           ? value
           : cleanSet(obj[path[0]], path.slice(1), value),
-    };
+    // @ts-ignore
+    }, ...rest);
   }
 }

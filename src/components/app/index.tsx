@@ -3,14 +3,13 @@ import { useState } from "preact/hooks";
 import LazyComponent from "../lazy-component/index.jsx";
 
 export default function App() {
-  const [file, setFile] = useState<ArrayBuffer | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
   async function onFileChange(ev: InputEvent) {
     const input = ev.target as HTMLInputElement;
     const file = input.files?.[0];
     if (file) {
-      const buffer = await new Response(file).arrayBuffer();
-      setFile(buffer);
+      setFile(file);
     }
   }
 
@@ -21,7 +20,7 @@ export default function App() {
     <LazyComponent
       promise={import("../editor/index.jsx")}
       loading={() => <pre>Loading...</pre>}
-      loaded={({ default: Editor }) => <Editor buffer={file} />}
+      loaded={({ default: Editor }) => <Editor file={file} />}
     />
   );
 }
