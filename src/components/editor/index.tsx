@@ -1,68 +1,63 @@
 import { h, Fragment } from "preact";
+import { useEffect } from "preact/hooks";
 import { useAsyncReducer } from "../../use-async-reducer.js";
-import { Image } from "../../image.js";
-import { decode } from "../../raw-decoder.js";
 import ImageView from "../image-view/index.jsx";
 import { cleanSet } from "../../clean-set.js";
+import ProcessingSteps, {
+  process,
+  processNoCache,
+  ProcessingStep,
+  ProcessorType,
+  processCacheOnly,
+} from "../process-steps/index.jsx";
 // @ts-ignore
 import classes from "./index.module.css";
-import { Operation } from "../../operations.js";
 
 interface State {
   file: Blob | null;
-  image: Image | null;
-  operations: Array<Operation>;
+  steps: ProcessingStep;
 }
 
-const enum ActionType {
-  DecodeImage,
+interface Action {
+  path: (string | number)[];
+  value: any;
 }
 
-interface DecodeImageAction {
-  type: ActionType.DecodeImage;
-  file: Blob;
-  scale?: number;
+async function reducer(state: State, action: Action) {
+  if (action.path.length > 0) {
+    state = cleanSet(state, action.path, action.value);
+  }
+  await process(state.steps);
+  // New wrapper object to ensure a re-render. Debouncing happens
+  // in sub-components.
+  return { ...state };
 }
-
-type Action = DecodeImageAction;
-
-type ActionObject = {
-  [key in ActionType]: (state: State, action: Action) => Promise<State>;
-};
-const actions: ActionObject = {
-  async [ActionType.DecodeImage](state: State, action: DecodeImageAction) {
-    const buffer = await new Response(action.file).arrayBuffer();
-    const image = decode(buffer, (action.scale ?? 100) / 100);
-    return cleanSet(state, ["image"], image);
-  },
-};
 
 export interface Props {
   file: Blob;
   initialScale?: number;
 }
 export default function Editor({ file, initialScale = 20 }: Props) {
-  const [{ image, operations }, dispatch] = useAsyncReducer<State, Action>(
-    async (state: State, action: Action): Promise<State> => {
-      return actions[action.type](state, action);
-    },
-    { file: null, image: null, operations: [] }
-  );
-
-  if (image === null) {
-    dispatch({
-      type: ActionType.DecodeImage,
+  const [{ steps }, dispatch] = useAsyncReducer<State, Action>(reducer, {
+    file,
+    steps: {
+      type: ProcessorType.DECODE,
       file,
       scale: initialScale,
-    });
-  }
+    },
+  });
+
+  // Kick-off processing on mount.
+  useEffect(() => dispatch({ path: [], value: null }), []);
+  const image = processCacheOnly(steps);
+
   return (
     <section classes={classes.editor}>
       <div classes={classes.view}>
         {image ? <ImageView image={image} /> : "Loading..."}
       </div>
-      <div classes={classes.controls}>
-        <pre>{JSON.stringify(operations, null, "")}</pre>
+      <div classes={classes.processing}>
+        <ProcessingSteps steps={steps} />
       </div>
     </section>
   );

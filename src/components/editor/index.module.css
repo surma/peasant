@@ -1,13 +1,15 @@
 .editor {
   display: grid;
   grid-template-columns: 1fr max-content;
-  grid-template-areas: "view controls";
+  grid-template-areas: "view processing";
 }
 
 .view {
   grid-area: view;
 }
 
-.controls {
-  grid-area: controls;
+.processing {
+  grid-area: processing;
+  display: flex;
+  flex-direction: column;
 }

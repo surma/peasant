@@ -1,4 +1,5 @@
-export const enum OperationType {
+export enum OperationType {
+  OPERATION_DECODE_IMAGE,
   OPERATION_COLORSPACE_CONVERSION,
   OPERATION_APPLY_CURVE,
 }

@@ -4,7 +4,7 @@ export function cleanSet<T>(
   value: any
 ): T;
 export function cleanSet(obj, ...[path, value, ...rest]) {
-  if(!path) return obj;
+  if (!path) return obj;
   if (Array.isArray(obj)) {
     const newObj = [...obj];
     newObj.splice(
@@ -15,13 +15,16 @@ export function cleanSet(obj, ...[path, value, ...rest]) {
     // @ts-ignore
     return cleanSet(newObj, ...rest);
   } else {
-    return cleanSet({
-      ...obj,
-      [path[0]]:
-        path.length === 1
-          ? value
-          : cleanSet(obj[path[0]], path.slice(1), value),
-    // @ts-ignore
-    }, ...rest);
+    return cleanSet(
+      {
+        ...obj,
+        [path[0]]:
+          path.length === 1
+            ? value
+            : cleanSet(obj[path[0]], path.slice(1), value),
+      },
+      // @ts-ignore
+      ...rest
+    );
   }
 }
