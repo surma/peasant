@@ -20,7 +20,7 @@ interface State {
   image?: Image;
 }
 
-interface Action {
+export interface Action {
   path: (string | number)[];
   value: any;
 }
@@ -46,13 +46,20 @@ export default function Editor({ file, initialScale = 20 }: Props) {
     steps: {
       type: ProcessorType.CURVE,
       curvePoints: [
-        { x: 0, y: 1 },
-        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
       ],
       source: {
-        type: ProcessorType.DECODE,
-        file,
-        scale: initialScale,
+        type: ProcessorType.CURVE,
+        curvePoints: [
+          { x: 0, y: 1 },
+          { x: 1, y: 0 },
+        ],
+        source: {
+          type: ProcessorType.DECODE,
+          file,
+          scale: initialScale,
+        },
       },
     },
   });
@@ -62,10 +69,10 @@ export default function Editor({ file, initialScale = 20 }: Props) {
   return (
     <section classes={classes.editor}>
       <div classes={classes.view}>
-        {image ? <ImageView image={image} /> : "Loading..."}
+        {image ? <ImageView image={image} /> : "Rendering..."}
       </div>
       <div classes={classes.processing}>
-        <ProcessingSteps steps={steps} />
+        <ProcessingSteps path={["steps"]} steps={steps} dispatch={dispatch} />
       </div>
     </section>
   );

@@ -1,14 +1,16 @@
 import { h, Fragment } from "preact";
-import { useRef } from "preact/hooks";
+import * as hooks from "preact/hooks";
 import { Image } from "../../image.js";
 import { decode } from "../../raw-decoder.js";
 import { Point } from "../../tone-curve.js";
 import { GPUProcessor } from "../../webgpu.js";
 import { JSXInternal } from "preact/src/jsx";
+import { ToneCurve } from "../../tone-curve.js";
 
 // @ts-ignore
 import classes from "./index.module.css";
 import { ColorSpaceConversion, OperationType } from "../../operations.js";
+import { Action } from "../editor/index.js";
 
 export const enum ProcessorType {
   DECODE,
@@ -50,8 +52,12 @@ const processors: Processors = {
   },
   async [ProcessorType.CURVE](ctx, step: CurveProcessor) {
     const source = await process(ctx, step.source);
+    const f = ToneCurve.cardinalSpline(
+      ToneCurve.sortPoints(step.curvePoints),
+      0
+    );
     const curve = new Float32Array(512);
-    curve.forEach((_, i, arr) => (arr[i] = 1 - i / 255));
+    curve.forEach((_, i, arr) => (arr[i] = f(i / 512)));
     const result = await ctx.gpu.process(source, [
       {
         type: OperationType.OPERATION_APPLY_CURVE,
@@ -87,28 +93,49 @@ export async function process(
 }
 
 type ProcessDisplayRenderers = {
-  [key in ProcessorType]: (step: ProcessingStep) => JSXInternal.Element;
+  [key in ProcessorType]: (
+    step: ProcessingStep,
+    props: Props
+  ) => JSXInternal.Element;
 };
 const processStepRenderers: ProcessDisplayRenderers = {
-  [ProcessorType.DECODE](step: DecodeProcessor) {
+  [ProcessorType.DECODE](step: DecodeProcessor, props: Props) {
     return <pre>Decoding {step.scale}</pre>;
   },
-  [ProcessorType.CURVE](step: CurveProcessor) {
-    return <pre>Curve</pre>;
+  [ProcessorType.CURVE](step: CurveProcessor, { path = [], dispatch }: Props) {
+    function listener(ev) {
+      const tc = ev.target as ToneCurve;
+      dispatch({
+        path: [...path, "curvePoints"],
+        value: tc.points,
+      });
+    }
+    return (
+      <tone-curve points={step.curvePoints} oninput={listener}></tone-curve>
+    );
   },
 };
 
 interface Props {
   steps: ProcessingStep;
+  path: (string | number)[];
+  dispatch: (action: Action) => void;
 }
 
-export default function ProcessSteps({ steps }: Props) {
+export default function ProcessSteps(props: Props) {
+  const { steps, dispatch, path } = props;
   return (
     <>
       <div classes={classes.step}>
-        {processStepRenderers[steps.type](steps)}
+        {processStepRenderers[steps.type](steps, props)}
       </div>
-      {"source" in steps ? <ProcessSteps steps={steps.source} /> : null}
+      {"source" in steps ? (
+        <ProcessSteps
+          path={[...path, "source"]}
+          dispatch={dispatch}
+          steps={steps.source}
+        />
+      ) : null}
     </>
   );
 }

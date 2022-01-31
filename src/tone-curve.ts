@@ -131,6 +131,7 @@ export class ToneCurve extends HTMLElement {
       :host {
         display: block;
         position: relative;
+        aspect-ratio: 1;
       }
       canvas {
         position: absolute;
@@ -156,22 +157,26 @@ export class ToneCurve extends HTMLElement {
     this.ro.observe(this);
   }
 
-  private clampPoint(p: Point) {
+  static clampPoint(p: Point) {
     return {
       x: clamp(0, p.x, 1),
       y: clamp(0, p.y, 1),
     };
   }
 
-  sortedPoints() {
+  static sortPoints(p: Point[]): Point[] {
     // Work on a copy
-    let copy = this.points.slice();
+    let copy = p.slice();
 
     // Sort by x coordinate
     copy.sort((p1, p2) => p1.x - p2.x);
-    copy = copy.map((point) => this.clampPoint(point));
+    copy = copy.map((point) => ToneCurve.clampPoint(point));
 
     return copy;
+  }
+
+  sortedPoints() {
+    return ToneCurve.sortPoints(this.points);
   }
 
   private onResizeObserver(entries: ResizeObserverEntry[]) {
@@ -223,7 +228,7 @@ export class ToneCurve extends HTMLElement {
     this.ctx.save();
     this.ctx.strokeStyle = this.ctx.fillStyle = color;
     this.ctx.lineWidth = thickness;
-    const fn = this.curveFunction();
+    const fn = this.curveFunctionParametric();
     this.ctx.beginPath();
     this.ctx.moveTo(0, fn(0).y * this.height);
     for (let t = 0; t < 1; t += 1 / 256) {
@@ -275,10 +280,39 @@ export class ToneCurve extends HTMLElement {
     return 10 / Math.min(this.ctx.canvas.width, this.ctx.canvas.height);
   }
 
-  curveFunction(): (v: number) => Point {
-    const points = this.sortedPoints();
-    const tangents = cardinalSplineTangents(points, this._straightness);
-    return cubicHermite(points, tangents);
+  static cardinalSplineParametric(
+    p: Point[],
+    straightness: number
+  ): (v: number) => Point {
+    const tangents = cardinalSplineTangents(p, straightness);
+    return cubicHermite(p, tangents);
+  }
+
+  static cardinalSpline(
+    p: Point[],
+    straightness: number,
+    it: number = 8
+  ): (v: number) => number {
+    const tangents = cardinalSplineTangents(p, straightness);
+    const f = cubicHermite(p, tangents);
+    return (x) => {
+      let t = 0.5;
+      let d = 0.25;
+      let p = f(t);
+      for (let i = 0; i < it; i++) {
+        t += p.x > x ? -d : d;
+        d /= 2;
+        p = f(t);
+      }
+      return p.y;
+    };
+  }
+
+  curveFunctionParametric(): (v: number) => Point {
+    return ToneCurve.cardinalSplineParametric(
+      this.sortedPoints(),
+      this._straightness
+    );
   }
 
   private onMouseDown(ev: MouseEvent) {
@@ -344,7 +378,7 @@ export class ToneCurve extends HTMLElement {
     // If the alt key was pressed, create the point on the curve rather than
     // where the mouse is.
     if (ev.altKey) {
-      y = this.curveFunction()(x).y;
+      y = this.curveFunctionParametric()(x).y;
     }
     this.points.push({ x, y });
   }
@@ -368,7 +402,7 @@ export class ToneCurve extends HTMLElement {
   private onDragEnd(ev: MouseEvent) {
     this.repaint();
     if (this.dragState === null) return;
-    this.points[this.dragState.index] = this.clampPoint(
+    this.points[this.dragState.index] = ToneCurve.clampPoint(
       this.points[this.dragState.index]
     );
     this.dragState = null;
