@@ -1,6 +1,6 @@
 import { h, Fragment } from "preact";
 import { useState, useCallback } from "preact/hooks";
-import { Image } from "../../image";
+import { Image } from "../../core/image.js";
 import { clamp } from "../../utils";
 
 export interface Props<T> {

@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import type { Image } from "../image.js";
+import type { Image } from "../core/image.js";
 import {
   ColorSpaceConversion,
   encodeOperation,

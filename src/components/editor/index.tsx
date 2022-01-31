@@ -2,39 +2,12 @@ import { h, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import { useAsyncReducer } from "../../use-async-reducer.js";
 import ImageView from "../image-view/index.jsx";
-import { cleanSet } from "../../clean-set.js";
-import ProcessingSteps, {
-  process,
-  ProcessingStep,
-  ProcessorType,
-} from "../process-steps/index.jsx";
-import { GPUProcessor } from "../../gpu/gpu.js";
-import { Image } from "../../image";
+import { ProcessorType } from "../../core/processing.js";
+import ProcessingSteps from "../process-steps/index.jsx";
 
 // @ts-ignore
 import classes from "./index.module.css";
-
-interface State {
-  file: Blob | null;
-  steps: ProcessingStep;
-  image?: Image;
-}
-
-export interface Action {
-  path: (string | number)[];
-  value: any;
-}
-
-const gpu = new GPUProcessor();
-async function reducer(state: State, action: Action) {
-  if (action.path.length > 0) {
-    state = cleanSet(state, action.path, action.value);
-  }
-  state.image = await process({ gpu }, state.steps);
-  // New wrapper object to ensure a re-render. Debouncing happens
-  // in sub-components.
-  return { ...state };
-}
+import { Action, reducer, State } from "../../core/state.js";
 
 export interface Props {
   file: Blob;
