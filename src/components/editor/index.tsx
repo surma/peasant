@@ -5,17 +5,19 @@ import ImageView from "../image-view/index.jsx";
 import { cleanSet } from "../../clean-set.js";
 import ProcessingSteps, {
   process,
-  processNoCache,
   ProcessingStep,
   ProcessorType,
   processCacheOnly,
 } from "../process-steps/index.jsx";
 // @ts-ignore
 import classes from "./index.module.css";
+import { GPUProcessor } from "../../webgpu.js";
+import { Image } from "../../image";
 
 interface State {
   file: Blob | null;
   steps: ProcessingStep;
+  image?: Image;
 }
 
 interface Action {
@@ -23,11 +25,12 @@ interface Action {
   value: any;
 }
 
+const gpu = new GPUProcessor();
 async function reducer(state: State, action: Action) {
   if (action.path.length > 0) {
     state = cleanSet(state, action.path, action.value);
   }
-  await process(state.steps);
+  state.image = await process({ gpu }, state.steps);
   // New wrapper object to ensure a re-render. Debouncing happens
   // in sub-components.
   return { ...state };
@@ -38,19 +41,24 @@ export interface Props {
   initialScale?: number;
 }
 export default function Editor({ file, initialScale = 20 }: Props) {
-  const [{ steps }, dispatch] = useAsyncReducer<State, Action>(reducer, {
+  const [{ steps, image }, dispatch] = useAsyncReducer<State, Action>(reducer, {
     file,
     steps: {
-      type: ProcessorType.DECODE,
-      file,
-      scale: initialScale,
+      type: ProcessorType.CURVE,
+      curvePoints: [
+        { x: 0, y: 1 },
+        { x: 1, y: 0 },
+      ],
+      source: {
+        type: ProcessorType.DECODE,
+        file,
+        scale: initialScale,
+      },
     },
   });
 
   // Kick-off processing on mount.
   useEffect(() => dispatch({ path: [], value: null }), []);
-  const image = processCacheOnly(steps);
-
   return (
     <section classes={classes.editor}>
       <div classes={classes.view}>

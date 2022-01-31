@@ -1,7 +1,5 @@
 /// <reference types="@webgpu/types" />
 
-import { Node } from "./dag.js";
-
 import type { Image } from "./image.js";
 import { encodeOperation, Operation } from "./operations.js";
 
@@ -18,179 +16,216 @@ import processingSrc from "./wgsl/processing.wgsl?raw";
 // @ts-ignore
 import renderSrc from "./wgsl/render.wgsl?raw";
 
-function totalAbort(msg) {
-  document.body.innerHTML = `<pre class="error">${msg}</pre>`;
-}
+export class GPUProcessor {
+  private device: GPUDevice;
+  private adapter: GPUAdapter;
+  private operationsBuffer: GPUBuffer;
+  private bufferIn: GPUBuffer;
+  private bufferOut: GPUBuffer;
+  private gpuReadBuffer: GPUBuffer;
+  private bindGroupLayout: GPUBindGroupLayout;
+  private processingPipeline: GPUComputePipeline;
+  private renderPipeline: GPUComputePipeline;
+  private ready: Promise<void>;
 
-let device: GPUDevice;
-await (async () => {
-  if (!("gpu" in navigator)) {
-    totalAbort("WebGPU is not supported.");
-    return;
+  constructor() {
+    if (!("gpu" in navigator)) {
+      throw Error("WebGPU not supports");
+    }
+    this.ready = this.init().then(() => {});
   }
-  const adapter = await navigator.gpu.requestAdapter();
-  if (!adapter) {
-    totalAbort("Couldn’t request WebGPU adapter.");
-    return;
+
+  async init() {
+    this.adapter = await navigator.gpu.requestAdapter();
+    if (!this.adapter) {
+      throw Error("Couldn’t request WebGPU adapter.");
+    }
+    this.device = await this.adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: MAX_BUFFER_SIZE,
+      },
+    });
+    if (!this.device) {
+      throw Error("Couldn’t request WebGPU device.");
+    }
+
+    this.bindGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "read-only-storage",
+          },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "storage",
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "read-only-storage",
+          },
+        },
+      ],
+    });
+
+    const processingModule = this.device.createShaderModule({
+      code: [bindingsSrc, colorspacesSrc, curvesSrc, processingSrc].join("\n"),
+    });
+
+    const renderModule = this.device.createShaderModule({
+      code: [colorspacesSrc, renderSrc].join("\n"),
+    });
+
+    this.processingPipeline = this.device.createComputePipeline({
+      layout: this.device.createPipelineLayout({
+        bindGroupLayouts: [this.bindGroupLayout],
+      }),
+      compute: {
+        module: processingModule,
+        entryPoint: "main",
+      },
+    });
+
+    this.renderPipeline = this.device.createComputePipeline({
+      layout: this.device.createPipelineLayout({
+        bindGroupLayouts: [this.bindGroupLayout],
+      }),
+      compute: {
+        module: renderModule,
+        entryPoint: "main",
+      },
+    });
+
+    this.operationsBuffer = this.device.createBuffer({
+      size:
+        4 * Uint32Array.BYTES_PER_ELEMENT +
+        1024 * Float32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
   }
-  device = await adapter.requestDevice({
-    requiredLimits: {
-      maxStorageBufferBindingSize: MAX_BUFFER_SIZE,
-    },
-  });
-  if (!device) {
-    totalAbort("Couldn’t request WebGPU device.");
-    return;
+
+  private recreateBuffers(size: number) {
+    if (this.bufferIn) this.bufferIn.destroy();
+    this.bufferIn = this.device.createBuffer({
+      size,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    });
+
+    if (this.bufferOut) this.bufferOut.destroy();
+    this.bufferOut = this.device.createBuffer({
+      size,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+    });
+
+    if (this.gpuReadBuffer) this.gpuReadBuffer.destroy();
+    this.gpuReadBuffer = this.device.createBuffer({
+      size,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
   }
-})();
 
-interface ImageUploaderOutput {
-  numPixels: number;
-  numInputBytes: number;
-  numOutputBytes: number;
-  img: Image;
-}
+  async process(img: Image, operations: Operation[]): Promise<Image> {
+    await this.ready;
+    const numPixels = img.width * img.height;
+    const numBytes = numPixels * 4 * Float32Array.BYTES_PER_ELEMENT;
 
-export function ProcessingNode(
-  img: Node<any, Image | null>,
-  operationsNode: Node<any, Operation[]>
-) {
-  let bufferIn: GPUBuffer;
-  let bufferOut: GPUBuffer;
-  let gpuReadBuffer: GPUBuffer;
+    this.recreateBuffers(numBytes);
 
-  const bindGroupLayout = device.createBindGroupLayout({
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "read-only-storage",
-        },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "storage",
-        },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "read-only-storage",
-        },
-      },
-    ],
-  });
+    this.device.queue.writeBuffer(this.bufferIn, 0, img.data);
 
-  const processingModule = device.createShaderModule({
-    code: [bindingsSrc, colorspacesSrc, curvesSrc, processingSrc].join("\n"),
-  });
+    for (const op of operations) {
+      this.device.queue.writeBuffer(
+        this.operationsBuffer,
+        0,
+        this.createOperationsBuffer(img.width, img.height, op)
+      );
 
-  const renderModule = device.createShaderModule({
-    code: [colorspacesSrc, renderSrc].join("\n"),
-  });
+      const commandEncoder = this.device.createCommandEncoder();
+      const passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(this.processingPipeline);
+      passEncoder.setBindGroup(0, this.createBindGroup());
+      passEncoder.dispatch(
+        Math.ceil(img.width / 16),
+        Math.ceil(img.height / 16)
+      );
+      passEncoder.endPass();
+      const commands = commandEncoder.finish();
+      this.device.queue.submit([commands]);
+      this.swapBuffers();
+    }
+    // If the loop ended, undo the last swap so that there is
+    // a result in `bufferOut`.
+    this.swapBuffers();
 
-  const processingPipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout],
-    }),
-    compute: {
-      module: processingModule,
-      entryPoint: "main",
-    },
-  });
+    return {
+      ...img,
+      data: new Float32Array(await this.readOutBuffer(numBytes)),
+    };
+  }
 
-  const renderPipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout],
-    }),
-    compute: {
-      module: renderModule,
-      entryPoint: "main",
-    },
-  });
+  async render(img: Image): Promise<Image<Uint8ClampedArray>> {
+    await this.ready;
+    const numPixels = img.width * img.height;
+    const numBytes = numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
 
-  const operationsBuffer = device.createBuffer({
-    size:
-      4 * Uint32Array.BYTES_PER_ELEMENT + 1024 * Float32Array.BYTES_PER_ELEMENT,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
+    this.recreateBuffers(numBytes);
+    this.device.queue.writeBuffer(this.bufferIn, 0, img.data);
 
-  function createBindGroup() {
-    return device.createBindGroup({
-      layout: bindGroupLayout,
+    const commandEncoder = this.device.createCommandEncoder();
+    const passEncoder = commandEncoder.beginComputePass();
+    passEncoder.setPipeline(this.renderPipeline);
+    passEncoder.setBindGroup(0, this.createBindGroup());
+    passEncoder.dispatch(Math.ceil(img.width / 16), Math.ceil(img.height / 16));
+    passEncoder.endPass();
+    const commands = commandEncoder.finish();
+    this.device.queue.submit([commands]);
+
+    return {
+      ...img,
+      data: new Uint8ClampedArray(await this.readOutBuffer(numBytes)),
+    };
+  }
+
+  private createBindGroup(): GPUBindGroup {
+    return this.device.createBindGroup({
+      layout: this.bindGroupLayout,
       entries: [
         {
           binding: 0,
           resource: {
-            buffer: bufferIn,
+            buffer: this.bufferIn,
           },
         },
         {
           binding: 1,
           resource: {
-            buffer: bufferOut,
+            buffer: this.bufferOut,
           },
         },
         {
           binding: 2,
           resource: {
-            buffer: operationsBuffer,
+            buffer: this.operationsBuffer,
           },
         },
       ],
     });
   }
 
-  // A separate node so that image uploading doesn’t happen on every update,
-  // but only when the image actually changes.
-  const imgUploaderNode = new Node<[Image | null], ImageUploaderOutput | null>({
-    inputs: [img],
-    async update([img]) {
-      if (!img) return null;
-      const numPixels = img.width * img.height;
-      const numInputBytes = numPixels * 4 * Float32Array.BYTES_PER_ELEMENT;
-      const numOutputBytes =
-        numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
-
-      if (bufferIn) bufferIn.destroy();
-      bufferIn = device.createBuffer({
-        size: numInputBytes,
-        usage:
-          GPUBufferUsage.STORAGE |
-          GPUBufferUsage.COPY_DST |
-          GPUBufferUsage.COPY_SRC,
-      });
-
-      if (bufferOut) bufferOut.destroy();
-      bufferOut = device.createBuffer({
-        size: numInputBytes,
-        usage:
-          GPUBufferUsage.STORAGE |
-          GPUBufferUsage.COPY_DST |
-          GPUBufferUsage.COPY_SRC,
-      });
-
-      if (gpuReadBuffer) bufferOut.destroy();
-      gpuReadBuffer = device.createBuffer({
-        // size: numOutputBytes,
-        size: numInputBytes,
-        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-      });
-
-      return {
-        numPixels,
-        numInputBytes,
-        numOutputBytes,
-        img,
-      };
-    },
-  });
-
-  function createOperationsBuffer(
+  private createOperationsBuffer(
     width: number,
     height: number,
     op?: Operation
@@ -209,84 +244,26 @@ export function ProcessingNode(
     return buffer;
   }
 
-  async function readOutBuffer(numBytes: number): Promise<ArrayBuffer> {
-    const commandEncoder = device.createCommandEncoder();
-    commandEncoder.copyBufferToBuffer(bufferOut, 0, gpuReadBuffer, 0, numBytes);
+  private async readOutBuffer(numBytes: number): Promise<ArrayBuffer> {
+    const commandEncoder = this.device.createCommandEncoder();
+    commandEncoder.copyBufferToBuffer(
+      this.bufferOut,
+      0,
+      this.gpuReadBuffer,
+      0,
+      numBytes
+    );
     const commands = commandEncoder.finish();
-    device.queue.submit([commands]);
+    this.device.queue.submit([commands]);
 
-    await gpuReadBuffer.mapAsync(GPUMapMode.READ, 0, numBytes);
-    const copyArrayBuffer = gpuReadBuffer.getMappedRange(0, numBytes);
+    await this.gpuReadBuffer.mapAsync(GPUMapMode.READ, 0, numBytes);
+    const copyArrayBuffer = this.gpuReadBuffer.getMappedRange(0, numBytes);
     const data = copyArrayBuffer.slice(0);
-    gpuReadBuffer.unmap();
+    this.gpuReadBuffer.unmap();
     return data;
   }
 
-  async function readOutBufferAsImageData(
-    width: number,
-    height: number
-  ): Promise<ImageData> {
-    const numOutputBytes =
-      width * height * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;
-
-    [bufferIn, bufferOut] = [bufferOut, bufferIn];
-    device.queue.writeBuffer(
-      operationsBuffer,
-      0,
-      createOperationsBuffer(width, height, null)
-    );
-    const commandEncoder = device.createCommandEncoder();
-    const passEncoder = commandEncoder.beginComputePass();
-    passEncoder.setPipeline(renderPipeline);
-    passEncoder.setBindGroup(0, createBindGroup());
-    passEncoder.dispatch(Math.ceil(width / 16), Math.ceil(height / 16));
-    passEncoder.endPass();
-    const commands = commandEncoder.finish();
-    device.queue.submit([commands]);
-
-    const buffer = await readOutBuffer(numOutputBytes);
-    const data = new Uint8ClampedArray(buffer).slice();
-    return new ImageData(data, width, height);
+  private swapBuffers() {
+    [this.bufferIn, this.bufferOut] = [this.bufferOut, this.bufferIn];
   }
-
-  return new Node<
-    [ImageUploaderOutput | null, Operation[]],
-    Image<Uint8ClampedArray> | null
-  >({
-    inputs: [imgUploaderNode, operationsNode],
-    async update([iuo, operations]) {
-      if (!iuo) return null;
-      const { img } = iuo;
-      device.queue.writeBuffer(bufferIn, 0, img.data);
-
-      for (const op of operations) {
-        device.queue.writeBuffer(
-          operationsBuffer,
-          0,
-          createOperationsBuffer(img.width, img.height, op)
-        );
-
-        const commandEncoder = device.createCommandEncoder();
-        const passEncoder = commandEncoder.beginComputePass();
-        passEncoder.setPipeline(processingPipeline);
-        passEncoder.setBindGroup(0, createBindGroup());
-        passEncoder.dispatch(
-          Math.ceil(img.width / 16),
-          Math.ceil(img.height / 16)
-        );
-        passEncoder.endPass();
-        const commands = commandEncoder.finish();
-        device.queue.submit([commands]);
-        [bufferIn, bufferOut] = [bufferOut, bufferIn];
-      }
-      // If the loop ended, undo the last swap so that there is
-      // a result in `bufferOut`.
-      [bufferIn, bufferOut] = [bufferOut, bufferIn];
-
-      return {
-        ...img,
-        data: (await readOutBufferAsImageData(img.width, img.height)).data,
-      };
-    },
-  });
 }

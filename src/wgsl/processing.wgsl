@@ -17,8 +17,8 @@ fn run_operation(color: vec4<f32>) -> vec4<f32> {
 	}
 }
 
-[[stage(compute), workgroup_size(16, 16)]]
-fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
+@stage(compute) @workgroup_size(16, 16)
+fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 	if(global_id.x >= operations.width) {
 		return;
 	}
