@@ -1,7 +1,7 @@
-import factory from "../raw/build/raw.js";
-import init, { resize_u16 } from "../resize/pkg/resize.js";
+import factory from "../../raw/build/raw.js";
+import init, { resize_u16 } from "../../resize/pkg/resize.js";
 
-import type { Image } from "./image.js";
+import type { Image } from "../image.js";
 
 const module = await factory();
 await module.ready;

@@ -1,7 +1,11 @@
 /// <reference types="@webgpu/types" />
 
-import type { Image } from "./image.js";
-import { encodeOperation, Operation } from "./operations.js";
+import type { Image } from "../image.js";
+import {
+  ColorSpaceConversion,
+  encodeOperation,
+  Operation,
+} from "./operations.js";
 
 const MAX_BUFFER_SIZE = 8192 ** 2 * 4 * Float32Array.BYTES_PER_ELEMENT;
 
@@ -176,7 +180,10 @@ export class GPUProcessor {
     };
   }
 
-  async render(img: Image): Promise<Image<Uint8ClampedArray>> {
+  async render(
+    img: Image,
+    space: ColorSpaceConversion = ColorSpaceConversion.XYZ_to_sRGB
+  ): Promise<Image<Uint8ClampedArray>> {
     await this.ready;
     const numPixels = img.width * img.height;
     const numBytes = numPixels * 4 * Uint8ClampedArray.BYTES_PER_ELEMENT;

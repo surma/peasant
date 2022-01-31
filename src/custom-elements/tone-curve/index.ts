@@ -1,4 +1,4 @@
-import { clamp, pointDistance } from "./utils.js";
+import { clamp, pointDistance } from "../../utils.js";
 
 export interface Point {
   x: number;
@@ -78,6 +78,7 @@ export function cubicHermite(
     );
   return (x: number) => {
     if (x < points[0].x) return points[0];
+    // @ts-ignore Don’t have at() yet.
     if (x >= points.at(-1).x) return points.at(-1);
     let idx = points.findIndex((point) => point.x > x)! - 1;
     return fns[idx](x);

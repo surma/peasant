@@ -1,15 +1,14 @@
 import { h, Fragment } from "preact";
-import * as hooks from "preact/hooks";
 import { Image } from "../../image.js";
-import { decode } from "../../raw-decoder.js";
-import { Point } from "../../tone-curve.js";
-import { GPUProcessor } from "../../webgpu.js";
+import { decode } from "../../raw-decoder/index.js";
+import { Point } from "../../custom-elements/tone-curve/index.js";
+import { GPUProcessor } from "../../gpu/gpu.js";
 import { JSXInternal } from "preact/src/jsx";
-import { ToneCurve } from "../../tone-curve.js";
+import { ToneCurve } from "../../custom-elements/tone-curve/index.js";
 
 // @ts-ignore
 import classes from "./index.module.css";
-import { ColorSpaceConversion, OperationType } from "../../operations.js";
+import { ColorSpaceConversion, OperationType } from "../../gpu/operations.js";
 import { Action } from "../editor/index.js";
 
 export const enum ProcessorType {
@@ -111,6 +110,7 @@ const processStepRenderers: ProcessDisplayRenderers = {
       });
     }
     return (
+      // @ts-ignore LOL
       <tone-curve points={step.curvePoints} oninput={listener}></tone-curve>
     );
   },

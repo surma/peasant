@@ -7,12 +7,12 @@ import ProcessingSteps, {
   process,
   ProcessingStep,
   ProcessorType,
-  processCacheOnly,
 } from "../process-steps/index.jsx";
+import { GPUProcessor } from "../../gpu/gpu.js";
+import { Image } from "../../image";
+
 // @ts-ignore
 import classes from "./index.module.css";
-import { GPUProcessor } from "../../webgpu.js";
-import { Image } from "../../image";
 
 interface State {
   file: Blob | null;
