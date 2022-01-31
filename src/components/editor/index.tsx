@@ -52,8 +52,8 @@ export default function Editor({ file, initialScale = 20 }: Props) {
       source: {
         type: ProcessorType.CURVE,
         curvePoints: [
-          { x: 0, y: 1 },
-          { x: 1, y: 0 },
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
         ],
         source: {
           type: ProcessorType.DECODE,
