@@ -12,3 +12,7 @@ export interface Image<T = Float32Array> {
   bits: number;
   data: T;
 }
+
+export function isImage(v: any): v is Image {
+  return "iso" in v;
+}

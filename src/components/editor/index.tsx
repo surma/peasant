@@ -1,13 +1,13 @@
 import { h, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
+import { Action, reducer, State } from "../../../state.js";
+import { decode } from "../../decoder/index.js";
 import { useAsyncReducer } from "../../use-async-reducer.js";
 import ImageView from "../image-view/index.jsx";
-import { ProcessorType } from "../../core/processing.js";
 import ProcessingSteps from "../process-steps/index.jsx";
 
 // @ts-ignore
 import classes from "./index.module.css";
-import { Action, reducer, State } from "../../core/state.js";
 
 export interface Props {
   file: Blob;
@@ -16,36 +16,48 @@ export interface Props {
 export default function Editor({ file, initialScale = 20 }: Props) {
   const [{ steps, image }, dispatch] = useAsyncReducer<State, Action>(reducer, {
     file,
-    steps: {
-      type: ProcessorType.CURVE,
-      curvePoints: [
-        { x: 0, y: 0 },
-        { x: 1, y: 1 },
-      ],
-      source: {
-        type: ProcessorType.CURVE,
-        curvePoints: [
-          { x: 0, y: 0 },
-          { x: 1, y: 1 },
-        ],
-        source: {
-          type: ProcessorType.DECODE,
-          file,
-          scale: initialScale,
-        },
-      },
+    decoderOptions: {
+      scale: 20,
     },
+    //   name: "curve",
+    //   data: {
+    //     curve: [
+    //       { x: 0, y: 0 },
+    //       { x: 1, y: 1 },
+    //     ],
+    //   },
+    //   source: {
+    //     name: "curve",
+    //     data: {
+    //       curve: [
+    //         { x: 0, y: 0 },
+    //         { x: 1, y: 1 },
+    //       ],
+    //     },
+    //     source: image
+    //   },
+    // },
   });
 
-  // Kick-off processing on mount.
-  useEffect(() => dispatch({ path: [], value: null }), []);
+  useEffect(
+    () =>
+      dispatch({
+        path: ["decoderOptions"],
+        value: {
+          scale: 20,
+        },
+      }),
+    []
+  );
   return (
     <section classes={classes.editor}>
       <div classes={classes.view}>
         {image ? <ImageView image={image} /> : "Rendering..."}
       </div>
       <div classes={classes.processing}>
-        <ProcessingSteps path={["steps"]} steps={steps} dispatch={dispatch} />
+        {steps ? (
+          <ProcessingSteps path={["steps"]} steps={steps} dispatch={dispatch} />
+        ) : null}
       </div>
     </section>
   );

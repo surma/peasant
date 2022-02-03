@@ -3,7 +3,7 @@ export enum OperationType {
   OPERATION_APPLY_CURVE,
 }
 
-export const enum ColorSpaceConversion {
+export enum ColorSpaceConversion {
   XYZ_to_sRGB = 0,
   XYZ_to_xyY,
   sRGB_to_XYZ = 256,
