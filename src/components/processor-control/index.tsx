@@ -17,9 +17,17 @@ interface Props {
 export default function ProcessorControl(props: Props) {
   const { step, dispatch, path } = props;
 
+  function deleteProcessor() {
+    dispatch({
+      path,
+      value: step.source,
+    });
+  }
+
   return (
     <>
       <div classes={classes.step}>
+        <button onClick={() => deleteProcessor()}>x</button>
         {renderStepUI({ step: step, dispatch, path })}
       </div>
       {step?.source ? (

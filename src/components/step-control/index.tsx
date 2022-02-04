@@ -1,11 +1,7 @@
 import { h, Fragment } from "preact";
 
-// @ts-ignore
-import classes from "./index.module.css";
-import { ProcessingStep, Step } from "../../processors";
-import { isImage } from "../../processors/image";
+import { Step } from "../../processors";
 import { Action } from "../../../state";
-import { renderStepUI } from "../processors";
 import { isDecodeStep } from "../../decoder";
 import DecoderControl from "../decoder-control";
 import ProcessorControl from "../processor-control";
