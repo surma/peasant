@@ -17,7 +17,6 @@ export interface Action {
 
 const gpu = new GPUProcessor();
 export async function reducer(state: State, action: Action) {
-  const oldState = state;
   if (action.path.length > 0) {
     state = cleanSet(state, action.path, action.value);
   }

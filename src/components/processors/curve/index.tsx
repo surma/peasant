@@ -17,7 +17,7 @@ export default {
     function listener(ev) {
       const tc = ev.target as ToneCurve;
       dispatch({
-        path: [...path, "curve"],
+        path: [...path, "data", "curve"],
         value: tc.points,
       });
     }

@@ -23,13 +23,12 @@ export default function Editor({ blob, initialScale = 20 }: Props) {
     }
   );
 
+  // Kick off initial processing
   useEffect(
     () =>
       dispatch({
-        path: ["decoderOptions"],
-        value: {
-          scale: 20,
-        },
+        path: [],
+        value: null,
       }),
     []
   );

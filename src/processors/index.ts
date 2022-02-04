@@ -53,9 +53,7 @@ function mustFindProcessorByName(name: string): Processor {
 
 function* stepsIterator(step: Step) {
   yield step;
-  if (isDecodeStep(step)) {
-    return;
-  }
+  if (isDecodeStep(step)) return;
   yield* stepsIterator(step.source);
 }
 
