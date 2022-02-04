@@ -27,7 +27,7 @@ export interface Processor {
 
 const processors: Processor[] = [curveProcessor, colorSpaceProcessor];
 
-// const PROCESSING_RESULT_CACHE = new WeakMap<ProcessingStep, Image>();
+const RESULT_CACHE = new WeakMap<ProcessingStep, Image>();
 
 export interface ProcessingContext {
   gpu: GPUProcessor;
@@ -63,9 +63,15 @@ export async function process(
   ctx: ProcessingContext,
   step: Step
 ): Promise<Image> {
-  const steps = [...stepsIterator(step)];
-  const decodeStep = steps.pop();
-  const image = await decode(decodeStep);
+  const steps = [...stepsIterator(step)].reverse();
+  const decodeStep = steps.shift();
+  let image: Image;
+  if(RESULT_CACHE.has(decodeStep)) {
+    image = RESULT_CACHE.get(decodeStep)!;
+  } else {
+    image = await decode(decodeStep);
+    RESULT_CACHE.set(decodeStep, image);
+  }
   const ops = steps.flatMap((step) =>
     mustFindProcessorByName(step.name).toGPUOperation(step)
   );
