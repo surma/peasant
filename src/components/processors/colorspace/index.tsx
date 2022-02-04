@@ -16,3 +16,14 @@ export default {
     return <pre>${ColorSpace[data.space]}</pre>;
   },
 };
+
+export function add(source: ProcessingStep): ProcessingStep {
+  const data: ColorSpaceProcessingData = {
+    space: ColorSpace.sRGB,
+  };
+  return {
+    name,
+    data,
+    source,
+  };
+}

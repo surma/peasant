@@ -20,7 +20,7 @@ export default function App() {
     <LazyComponent
       promise={import("../editor/index.jsx")}
       loading={() => <pre>Loading...</pre>}
-      loaded={({ default: Editor }) => <Editor file={file} />}
+      loaded={({ default: Editor }) => <Editor blob={file} />}
     />
   );
 }

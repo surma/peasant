@@ -14,5 +14,5 @@ export interface Image<T = Float32Array> {
 }
 
 export function isImage(v: any): v is Image {
-  return "iso" in v;
+  return v && "iso" in v;
 }

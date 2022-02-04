@@ -1,4 +1,5 @@
 import { ToneCurve, Point } from "../custom-elements/tone-curve/index.js";
+import { decode, DecodeStep, isDecodeStep } from "../decoder/index.js";
 import { GPUProcessor } from "../gpu/index.js";
 import {
   OperationType,
@@ -11,9 +12,11 @@ import colorSpaceProcessor from "./curve/index.js";
 
 import { Image, isImage } from "./image.js";
 
+export type Step = ProcessingStep | DecodeStep;
+
 export interface ProcessingStep {
   name: string;
-  source?: ProcessingStep | Image;
+  source?: Step;
   data: any;
 }
 
@@ -48,10 +51,9 @@ function mustFindProcessorByName(name: string): Processor {
 //   return PROCESSING_RESULT_CACHE.get(step);
 // }
 
-function* stepsIterator(step: ProcessingStep) {
+function* stepsIterator(step: Step) {
   yield step;
-  if (isImage(step.source)) {
-    yield step.source;
+  if (isDecodeStep(step)) {
     return;
   }
   yield* stepsIterator(step.source);
@@ -59,10 +61,11 @@ function* stepsIterator(step: ProcessingStep) {
 
 export async function process(
   ctx: ProcessingContext,
-  step: ProcessingStep
+  step: Step
 ): Promise<Image> {
   const steps = [...stepsIterator(step)];
-  const image = steps.pop();
+  const decodeStep = steps.pop();
+  const image = await decode(decodeStep);
   const ops = steps.flatMap((step) =>
     mustFindProcessorByName(step.name).toGPUOperation(step)
   );
