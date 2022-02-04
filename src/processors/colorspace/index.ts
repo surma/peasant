@@ -24,7 +24,7 @@ const processor: Processor = {
     const data = proc.data as ColorSpaceProcessingData;
 
     const conversion = ColorSpaceConversion[`XYZ_to_${ColorSpace[data.space]}`];
-    if (!conversion) {
+    if (conversion === undefined) {
       throw Error("Invalid color space");
     }
 

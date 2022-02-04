@@ -106,7 +106,7 @@ export class ToneCurve extends HTMLElement {
   private ro: ResizeObserver;
   private dragState: DragState | null = null;
   private _straightness: number = 0;
-  public points: Array<Point> = [
+  private _points: Array<Point> = [
     { x: 0, y: 0 },
     { x: 1, y: 1 },
   ];
@@ -144,6 +144,15 @@ export class ToneCurve extends HTMLElement {
     this.shadow.append(style);
   }
 
+  public get points() {
+    return this._points;
+  }
+
+  public set points(v: Point[]) {
+    this._points = v;
+    this.repaint();
+  }
+
   set straightness(val) {
     this._straightness = clamp(0, val, 1);
     this.repaint();
@@ -177,7 +186,7 @@ export class ToneCurve extends HTMLElement {
   }
 
   sortedPoints() {
-    return ToneCurve.sortPoints(this.points);
+    return ToneCurve.sortPoints(this._points);
   }
 
   private onResizeObserver(entries: ResizeObserverEntry[]) {
@@ -339,10 +348,10 @@ export class ToneCurve extends HTMLElement {
     );
 
     if (draggedPointIndex == null) return;
-    if (this.points.length <= 2) return;
+    if (this._points.length <= 2) return;
 
     ev.preventDefault();
-    this.points.splice(draggedPointIndex, 1);
+    this._points.splice(draggedPointIndex, 1);
   }
 
   private onLeftClick(ev: MouseEvent) {
@@ -368,12 +377,12 @@ export class ToneCurve extends HTMLElement {
 
     // ... otherwise create a new point.
 
-    if (this.points.length >= this.maxPoints) return;
+    if (this._points.length >= this.maxPoints) return;
 
     this.dragState = {
       lastX: x,
       lastY: y,
-      index: this.points.length,
+      index: this._points.length,
     };
 
     // If the alt key was pressed, create the point on the curve rather than
@@ -381,7 +390,7 @@ export class ToneCurve extends HTMLElement {
     if (ev.altKey) {
       y = this.curveFunctionParametric()(x).y;
     }
-    this.points.push({ x, y });
+    this._points.push({ x, y });
   }
 
   private onDragMove(ev: MouseEvent) {
@@ -391,7 +400,7 @@ export class ToneCurve extends HTMLElement {
     );
     if (this.dragState === null) return;
     ev.preventDefault();
-    const point = this.points[this.dragState.index];
+    const point = this._points[this.dragState.index];
     const factor = ev.altKey ? 0.1 : 1;
     point.x += factor * (x - this.dragState.lastX);
     point.y += factor * (y - this.dragState.lastY);
@@ -403,8 +412,8 @@ export class ToneCurve extends HTMLElement {
   private onDragEnd(ev: MouseEvent) {
     this.repaint();
     if (this.dragState === null) return;
-    this.points[this.dragState.index] = ToneCurve.clampPoint(
-      this.points[this.dragState.index]
+    this._points[this.dragState.index] = ToneCurve.clampPoint(
+      this._points[this.dragState.index]
     );
     this.dragState = null;
   }
@@ -414,7 +423,7 @@ export class ToneCurve extends HTMLElement {
     y: number,
     radius: number = 0.01
   ): number | null {
-    const candidates = this.points
+    const candidates = this._points
       .map((point, index) => ({
         index,
         point,

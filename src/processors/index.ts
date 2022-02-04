@@ -8,7 +8,7 @@ import {
 } from "../gpu/operations.js";
 
 import curveProcessor from "./curve/index.js";
-import colorSpaceProcessor from "./curve/index.js";
+import colorSpaceProcessor from "./colorspace/index.js";
 
 import { Image, isImage } from "./image.js";
 
@@ -66,7 +66,7 @@ export async function process(
   const steps = [...stepsIterator(step)].reverse();
   const decodeStep = steps.shift();
   let image: Image;
-  if(RESULT_CACHE.has(decodeStep)) {
+  if (RESULT_CACHE.has(decodeStep)) {
     image = RESULT_CACHE.get(decodeStep)!;
   } else {
     image = await decode(decodeStep);

@@ -7,7 +7,6 @@ import {
   name,
 } from "../../../processors/curve/index.js";
 import { ProcessingStep } from "../../../processors/index.js";
-import { ColorSpaceConversion } from "../../../gpu/operations.js";
 
 export default {
   canRender(step: ProcessingStep) {
