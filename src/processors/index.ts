@@ -41,16 +41,6 @@ function mustFindProcessorByName(name: string): Processor {
   return processor;
 }
 
-// export async function processNoCache(
-//   ctx: ProcessingContext,
-//   step: ProcessingStep
-// ): Promise<Image> {
-// }
-
-// export function processCacheOnly(step: ProcessingStep): Image | null {
-//   return PROCESSING_RESULT_CACHE.get(step);
-// }
-
 function* stepsIterator(step: Step) {
   yield step;
   if (isDecodeStep(step)) return;
@@ -74,10 +64,4 @@ export async function process(
     mustFindProcessorByName(step.name).toGPUOperation(step)
   );
   return ctx.gpu.process(image, ops);
-
-  // if (!PROCESSING_RESULT_CACHE.has(step)) {
-  //   const image = await processNoCache(ctx, step);
-  //   PROCESSING_RESULT_CACHE.set(step, image);
-  // }
-  // return PROCESSING_RESULT_CACHE.get(step);
 }

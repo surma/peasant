@@ -16,7 +16,12 @@ export enum ColorSpace {
 
 export interface CurveProcessingData {
   space: ColorSpace;
-  channel: number;
+  inMin: number;
+  inMax: number;
+  inChannel: number;
+  outMin: number;
+  outMax: number;
+  outChannel: number;
   curve: Point[];
 }
 
@@ -38,8 +43,13 @@ const processor: Processor = {
     return [
       {
         type: OperationType.OPERATION_APPLY_CURVE,
-        channel: data.channel,
         conversion,
+        inChannel: data.inChannel,
+        inMax: data.inMax,
+        inMin: data.inMin,
+        outChannel: data.outChannel,
+        outMax: data.outMax,
+        outMin: data.outMin,
         curve,
       },
     ];

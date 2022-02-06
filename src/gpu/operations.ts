@@ -18,7 +18,12 @@ export interface OperationColorspaceConversion {
 export interface OperationApplyCurve {
   type: OperationType.OPERATION_APPLY_CURVE;
   conversion: ColorSpaceConversion;
-  channel: number;
+  inMin: number;
+  inMax: number;
+  inChannel: number;
+  outMin: number;
+  outMax: number;
+  outChannel: number;
   curve: Float32Array;
 }
 
@@ -42,6 +47,11 @@ function encodeOperationColorspaceConversion(
 
 function encodeOperationApplyCurve(op: OperationApplyCurve, view: DataView) {
   view.setUint32(0, op.conversion, true);
-  view.setUint32(4, op.channel, true);
-  new Float32Array(view.buffer, view.byteOffset + 8).set(op.curve);
+  view.setFloat32(4, op.inMin, true);
+  view.setFloat32(8, op.inMax, true);
+  view.setUint32(12, op.inChannel, true);
+  view.setFloat32(16, op.outMin, true);
+  view.setFloat32(20, op.outMax, true);
+  view.setUint32(24, op.outChannel, true);
+  new Float32Array(view.buffer, view.byteOffset + 28).set(op.curve);
 }
