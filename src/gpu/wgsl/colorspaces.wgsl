@@ -160,11 +160,17 @@ fn convert_to_colorspace(color: vec4<f32>, target_colorspace: u32) -> vec4<f32> 
 		case 1u: { // XYZ_to_xyY
 			rgb_color = XYZ_to_xyY(rgb_color);
 		}
+		case 2u: { // XYZ_to_Lab
+			rgb_color = XYZ_to_Lab(rgb_color);
+		}
 		case 256u: { // sRGB_to_XYZ = XYZ_to_sRGB + 256 
 			rgb_color = sRGB_to_XYZ(rgb_color);
 		}
 		case 257u: { // xyY_to_XYZ
 			rgb_color = xyY_to_XYZ(rgb_color);
+		}
+		case 258u: { // Lab_to_XYZ
+			rgb_color = Lab_to_XYZ(rgb_color);
 		}
 		default: {
 			rgb_color = rgb_color;

@@ -7,14 +7,8 @@ import {
 
 export const name = "colorspace";
 
-export enum ColorSpace {
-  XYZ,
-  xyY,
-  sRGB,
-}
-
 export interface ColorSpaceProcessingData {
-  space: ColorSpace;
+  space: ColorSpaceConversion;
 }
 
 const processor: Processor = {
@@ -23,15 +17,10 @@ const processor: Processor = {
     if (proc.name !== name) return [];
     const data = proc.data as ColorSpaceProcessingData;
 
-    const conversion = ColorSpaceConversion[`XYZ_to_${ColorSpace[data.space]}`];
-    if (conversion === undefined) {
-      throw Error("Invalid color space");
-    }
-
     return [
       {
         type: OperationType.OPERATION_COLORSPACE_CONVERSION,
-        conversion,
+        conversion: data.space,
       },
     ];
   },

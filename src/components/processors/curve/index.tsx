@@ -23,7 +23,7 @@ export default {
       });
     }
 
-    function rangeInputListener(ev) {
+    function onParameterInputListener(ev) {
       const input = ev.target as HTMLInputElement;
       const field = input.dataset.field;
       dispatch({
@@ -41,26 +41,26 @@ export default {
         ></tone-curve>
         {["inMin", "inMax", "outMin", "outMax"].map((field) => (
           <label>
-            {field}:{" "}
+            {field}:
             <input
               type="number"
               step={0.01}
               value={data[field]}
               data-field={field}
-              onInput={rangeInputListener}
+              onInput={onParameterInputListener}
             />
           </label>
         ))}
         {["inChannel", "outChannel"].map((field) => (
           <label>
-            {field}:{" "}
+            {field}:
             <input
               type="number"
               value={data[field]}
               min={0}
               max={2}
               data-field={field}
-              onInput={rangeInputListener}
+              onInput={onParameterInputListener}
             />
           </label>
         ))}

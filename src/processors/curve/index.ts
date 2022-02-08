@@ -31,11 +31,6 @@ const processor: Processor = {
     if (proc.name !== name) return [];
     const data = proc.data as CurveProcessingData;
 
-    const conversion = ColorSpaceConversion[`XYZ_to_${ColorSpace[data.space]}`];
-    if (!conversion) {
-      throw Error("Invalid color space");
-    }
-
     const f = ToneCurve.cardinalSpline(ToneCurve.sortPoints(data.curve), 0);
     const curve = new Float32Array(512);
     curve.forEach((_, i, arr) => (arr[i] = f(i / 512)));
@@ -43,7 +38,6 @@ const processor: Processor = {
     return [
       {
         type: OperationType.OPERATION_APPLY_CURVE,
-        conversion,
         inChannel: data.inChannel,
         inMax: data.inMax,
         inMin: data.inMin,

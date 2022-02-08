@@ -6,8 +6,10 @@ export enum OperationType {
 export enum ColorSpaceConversion {
   XYZ_to_sRGB = 0,
   XYZ_to_xyY,
+  XYZ_to_Lab,
   sRGB_to_XYZ = 256,
   xyY_to_XYZ,
+  Lab_to_XYZ,
 }
 
 export interface OperationColorspaceConversion {
@@ -17,7 +19,6 @@ export interface OperationColorspaceConversion {
 
 export interface OperationApplyCurve {
   type: OperationType.OPERATION_APPLY_CURVE;
-  conversion: ColorSpaceConversion;
   inMin: number;
   inMax: number;
   inChannel: number;
@@ -46,12 +47,11 @@ function encodeOperationColorspaceConversion(
 }
 
 function encodeOperationApplyCurve(op: OperationApplyCurve, view: DataView) {
-  view.setUint32(0, op.conversion, true);
-  view.setFloat32(4, op.inMin, true);
-  view.setFloat32(8, op.inMax, true);
-  view.setUint32(12, op.inChannel, true);
-  view.setFloat32(16, op.outMin, true);
-  view.setFloat32(20, op.outMax, true);
-  view.setUint32(24, op.outChannel, true);
-  new Float32Array(view.buffer, view.byteOffset + 28).set(op.curve);
+  view.setFloat32(0, op.inMin, true);
+  view.setFloat32(4, op.inMax, true);
+  view.setUint32(8, op.inChannel, true);
+  view.setFloat32(12, op.outMin, true);
+  view.setFloat32(16, op.outMax, true);
+  view.setUint32(20, op.outChannel, true);
+  new Float32Array(view.buffer, view.byteOffset + 24).set(op.curve);
 }
