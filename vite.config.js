@@ -1,9 +1,13 @@
-export default {
+import { defineConfig } from "vite";
+
+export default defineConfig({
   build: {
     target: "esnext",
     module: "esm",
   },
   server: {
-    hmr: false,
+    fs: {
+      allow: ["/nix/store", "."],
+    },
   },
-};
+});

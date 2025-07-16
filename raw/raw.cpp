@@ -8,7 +8,7 @@ std::string version() {
   return std::string(LibRaw::version());
 }
 
-enum class ColorSpace { raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES };
+enum class ColorSpace { raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, P3, Rec2020 };
 
 void extract_meta(val &data, LibRaw *imageproc, libraw_processed_image_t *img) {
   auto width = imageproc->imgdata.sizes.width;
@@ -28,7 +28,7 @@ void extract_meta(val &data, LibRaw *imageproc, libraw_processed_image_t *img) {
   data.set("bits", img->bits);
 }
 
-val decode(std::string data) {
+val decode(std::string data, ColorSpace cs) {
   LibRaw *imageproc = new LibRaw;
   // 16 bit per channel
   imageproc->output_params_ptr()->output_bps = 16;
@@ -40,7 +40,7 @@ val decode(std::string data) {
   imageproc->output_params_ptr()->user_flip = 0;
 
   // Rec.2020 as output space
-  imageproc->output_params_ptr()->output_color = 8;
+  imageproc->output_params_ptr()->output_color = static_cast<int>(cs);  ;
 
 
   if (imageproc->open_buffer((void *)data.c_str(), data.size()) != 0) {
@@ -68,4 +68,17 @@ val decode(std::string data) {
   return result;
 }
 
-EMSCRIPTEN_BINDINGS(decoder) { function("decode", &decode); function("version", &version);}
+EMSCRIPTEN_BINDINGS(decoder) {
+  function("decode", &decode);
+  function("version", &version);
+  enum_<ColorSpace>("ColorSpace")
+  .value("raw", ColorSpace::raw)
+  .value("sRGB", ColorSpace::sRGB)
+  .value("Adobe", ColorSpace::Adobe)
+  .value("Wide", ColorSpace::Wide)
+  .value("ProPhoto", ColorSpace::ProPhoto)
+  .value("XYZ", ColorSpace::XYZ)
+  .value("ACES", ColorSpace::ACES)
+  .value("P3", ColorSpace::P3)
+  .value("Rec2020", ColorSpace::Rec2020);
+}

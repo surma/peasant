@@ -1,63 +1,66 @@
 {
-	autoconf,
-	automake,
-	libtool,
-	pkg-config,
-	emscripten,
-	emcache,
-	stdenv
+  autoconf,
+  automake,
+  libtool,
+  pkg-config,
+  emscripten,
+  stdenv,
 }:
 let
-	tarball = builtins.fetchurl {
-		url = "https://www.libraw.org/data/LibRaw-0.21.4.tar.gz";
-		sha256 = "sha256:0qwyl03285waafhyab012k52ajgzydmhbavaym7j2hvy74ckzr3b";
-	};
+  tarball = builtins.fetchurl {
+    url = "https://www.libraw.org/data/LibRaw-0.21.4.tar.gz";
+    sha256 = "sha256:0qwyl03285waafhyab012k52ajgzydmhbavaym7j2hvy74ckzr3b";
+  };
 
-	emscriptenDeps = [autoconf automake libtool pkg-config emscripten];
+  emscriptenDeps = [
+    autoconf
+    automake
+    libtool
+    pkg-config
+    emscripten
+  ];
 in
-	
- stdenv.mkDerivation {
-		name = "libraw";
 
-		nativeBuildInputs = emscriptenDeps;
+stdenv.mkDerivation {
+  name = "libraw";
 
-		unpackPhase = ''
-			runHook preUnpack
+  nativeBuildInputs = emscriptenDeps;
 
-			tar --strip-components 1 -xzf ${tarball}
+  unpackPhase = ''
+    			runHook preUnpack
 
-			runHook postUnpack
-		'';
+    			tar --strip-components 1 -xzf ${tarball}
 
-		configurePhase = ''
-			runHook preConfigure
+    			runHook postUnpack
+    		'';
 
-			mkdir -p $NIX_BUILD_TOP/.emscripten_cache
-			cp -r ${emcache}/* $NIX_BUILD_TOP/.emscripten_cache
-			export EM_CACHE=$NIX_BUILD_TOP/.emscripten_cache
-			find $EM_CACHE | xargs -n1 chmod u+w
+  configurePhase = ''
+    			runHook preConfigure
 
-			autoreconf -iv 
+    			mkdir -p $NIX_BUILD_TOP/.emscripten_cache
+    			export EM_CACHE=$NIX_BUILD_TOP/.emscripten_cache
 
-			emconfigure ./configure \
-				--disable-openmp \
-				--disable-lcms \
-				--disable-examples \
-				--disable-shared \
-				--enable-static \
-				--prefix=$out
+    			autoreconf -iv 
 
-			runHook postConfigure
-		'';
+    			emconfigure ./configure \
+    				--disable-openmp \
+    				--disable-lcms \
+    				--disable-examples \
+    				--disable-shared \
+    				--enable-static \
+    				--prefix=$out
 
-		buildPhase = ''
-			runHook preBuild
+    			runHook postConfigure
+    		'';
 
-			export EM_CACHE=$NIX_BUILD_TOP/.emscripten_cache
+  buildPhase = ''
+    			runHook preBuild
 
-			emmake make
+    			export EM_CACHE=$NIX_BUILD_TOP/.emscripten_cache
 
-			runHook postBuild
-		'';
-		dontFixup = true;
-	}
+    			emmake make
+
+    			runHook postBuild
+    		'';
+  dontFixup = true;
+}
