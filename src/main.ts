@@ -1,4 +1,4 @@
-import factory from "../raw/result/decoder.js";
+import factory from "nix-build:raw/default.nix:decoder.js";
 const { decode, version, ColorSpace } = await factory();
 
 console.log(version());
